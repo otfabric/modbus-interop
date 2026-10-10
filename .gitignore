@@ -1,0 +1,12 @@
+# Local build artifacts
+adapters/*/build/
+adapters/*/target/
+adapters/*/bin/
+adapters/*/obj/
+adapters/*/__pycache__/
+reports/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store

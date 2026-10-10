@@ -1,0 +1,113 @@
+name: Release
+run-name: "Release ${{ github.ref_name }}"
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # create the GitHub release
+  packages: write   # push to GHCR
+
+env:
+  REGISTRY: ghcr.io/otfabric
+  # Nothing is pulled from Docker Hub: anonymous pulls are rate limited per
+  # runner address and its token service times out under load. Base images
+  # (pinned by digest) and build tooling come from Google's mirror of it, and
+  # every registry operation is retried on transient failures (scripts/retry.sh).
+  BASE_REGISTRY: mirror.gcr.io/library
+  TOOLS_REGISTRY: mirror.gcr.io
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  # One job per architecture on a runner of that architecture: the images are
+  # built natively, self-tested, and exactly those are pushed, as
+  # <image>:<version>-<arch>.
+  build:
+    name: Build, test, push (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema
+
+      - name: Validate
+        run: |
+          scripts/check-versions.sh
+          python3 scripts/validate-fixtures.py --require-schema
+          want="interop_version: \"${VERSION#v}\""
+          grep -qF "$want" versions.yaml || { echo "::error::versions.yaml does not say $want"; exit 1; }
+
+      - name: Build for linux/${{ matrix.arch }} and self-test
+        run: |
+          make images
+          make documents
+
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "${GHCR_TOKEN}" > "${RUNNER_TEMP}/ghcr-token"
+          # shellcheck disable=SC2016  # $0 and $1 are for the inner shell
+          scripts/retry.sh sh -c 'docker login ghcr.io --username "$0" --password-stdin < "$1"' \
+            "${{ github.actor }}" "${RUNNER_TEMP}/ghcr-token"
+          rm -f "${RUNNER_TEMP}/ghcr-token"
+
+      - name: Push the tested images as ${{ github.ref_name }}-${{ matrix.arch }}
+        run: make publish-arch ARCH=${{ matrix.arch }}
+
+  # Joins the per-architecture images into the multi-arch tag and publishes
+  # the release. Nothing is built here.
+  release:
+    name: Multi-arch manifest and release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: build
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "${GHCR_TOKEN}" > "${RUNNER_TEMP}/ghcr-token"
+          # shellcheck disable=SC2016  # $0 and $1 are for the inner shell
+          scripts/retry.sh sh -c 'docker login ghcr.io --username "$0" --password-stdin < "$1"' \
+            "${{ github.actor }}" "${RUNNER_TEMP}/ghcr-token"
+          rm -f "${RUNNER_TEMP}/ghcr-token"
+
+      - name: Create ${{ github.ref_name }} from the amd64 and arm64 images
+        run: make publish-manifest
+
+      - name: Digests of the multi-arch images
+        run: |
+          make -s digests | tee digests.txt
+          while read -r adapter digest; do
+            [[ "${digest}" == sha256:* ]] || { echo "::error::no digest for ${adapter}"; exit 1; }
+          done < digests.txt
+
+      - name: Write manifest.json and the release notes
+        run: |
+          scripts/release-manifest.py "${VERSION}" "${GITHUB_SHA}" digests.txt manifest.json release-body.md
+          cat manifest.json release-body.md
+          sha256sum manifest.json > checksums.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release-body.md
+          files: |
+            manifest.json
+            checksums.txt

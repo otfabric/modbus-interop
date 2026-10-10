@@ -1,0 +1,24 @@
+modbus-interop-digitalpetri: what the image contains and under which licence.
+
+The exact jars of a build are listed in BUNDLED-JARS.txt (written by the image
+build). They are the unmodified artifacts from Maven Central.
+
+Component                                   Licence        Text
+------------------------------------------  -------------  -----------------------------
+modbus-interop adapter (this repository)    MIT            modbus-interop/LICENSE
+com.digitalpetri.modbus:modbus, modbus-tcp  EPL-2.0        EPL-2.0.txt
+com.digitalpetri.netty:netty-channel-fsm    EPL-2.0        EPL-2.0.txt
+com.digitalpetri.fsm:strict-machine         EPL-2.0        EPL-2.0.txt
+io.netty:netty-* (Netty)                    Apache-2.0     Apache-2.0.txt, netty-NOTICE.txt
+com.google.code.gson:gson                   Apache-2.0     Apache-2.0.txt
+com.google.errorprone:error_prone_annotations  Apache-2.0  Apache-2.0.txt
+org.slf4j:slf4j-api, slf4j-simple           MIT            slf4j-*/LICENSE.txt
+
+Source code of the EPL-2.0 components:
+  https://github.com/digitalpetri/modbus
+  https://github.com/digitalpetri/netty-channel-fsm
+  https://github.com/digitalpetri/strict-machine
+
+The Java runtime is Eclipse Temurin (GPL-2.0 WITH Classpath-exception-2.0) from
+the base image; its licence and notices are in /opt/java/openjdk/legal and
+/opt/java/openjdk/NOTICE.

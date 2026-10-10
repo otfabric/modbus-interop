@@ -1,0 +1,104 @@
+name: CI
+run-name: "CI (${{ github.event_name }}) on ${{ github.ref_name }} by @${{ github.actor }}"
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  schedule:
+    # Nightly: catches drift in what the pinned builds fetch.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Nothing is pulled from Docker Hub: anonymous pulls are rate limited per
+  # runner address and its token service times out under load. Base images
+  # (pinned by digest) and build tooling come from Google's mirror of it, and
+  # every registry operation is retried on transient failures (scripts/retry.sh).
+  BASE_REGISTRY: mirror.gcr.io/library
+  TOOLS_REGISTRY: mirror.gcr.io
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Fixtures, versions, scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema
+      - name: versions.yaml matches the build files
+        run: scripts/check-versions.sh
+      - name: Fixtures
+        run: python3 scripts/validate-fixtures.py --require-schema
+      - name: Shellcheck
+        run: make lint
+      - name: No reference to a library under test
+        # REQUIREMENTS.md R1: adapters, fixtures, scripts and schemas must not
+        # know any consumer. Documentation may name consumers as examples.
+        run: |
+          if grep -rInE 'otfabric/go-|go-modbus|modbusctl' adapters fixtures schemas scripts tests Makefile compose.yaml; then
+            echo "::error::consumer-specific reference found"; exit 1
+          fi
+
+  # Built and self-tested natively on both architectures: no emulation.
+  selftest:
+    name: Build, smoke, cross-stack (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema
+
+      - name: Build images
+        run: make images
+
+      - name: Capabilities
+        run: make capabilities | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Images are linux/${{ matrix.arch }}
+        run: |
+          for image in $(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'modbus-interop-.*:dev$'); do
+            got=$(docker image inspect --format '{{.Architecture}}' "${image}")
+            [[ "${got}" == "${{ matrix.arch }}" ]] || { echo "::error::${image} is ${got}"; exit 1; }
+          done
+
+      - name: Smoke, cross-stack self-test, document schemas
+        run: make documents
+
+      - name: Collect container logs on failure
+        if: failure()
+        run: |
+          mkdir -p reports/logs
+          for c in $(docker ps -aq --filter "label=modbus-interop.run"); do
+            docker logs "$c" > "reports/logs/${c}.log" 2>&1 || true
+          done
+
+      - name: Upload documents
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: selftest-documents-${{ matrix.arch }}
+          path: reports/
+          if-no-files-found: ignore

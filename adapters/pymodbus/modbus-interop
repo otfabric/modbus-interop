@@ -1,0 +1,18 @@
+#!/usr/local/bin/python3 -I
+# SPDX-License-Identifier: MIT
+"""Entry point of the modbus-interop adapter for PyModbus."""
+
+import os
+import sys
+
+sys.path[:0] = ["/opt/modbus-interop", "/opt/modbus-interop/site-packages"]
+
+from modbus_interop.main import main  # noqa: E402  pylint: disable=wrong-import-position
+
+if __name__ == "__main__":
+    code = main(sys.argv[1:])
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Leave without waiting for helper threads (a name lookup that is still
+    # running must not outlive the timeout of the operation).
+    os._exit(code)

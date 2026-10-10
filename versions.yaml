@@ -1,0 +1,120 @@
+# Machine-readable version manifest for modbus-interop.
+# Upstream pins and base image digests are release inputs; nothing floats.
+# The Dockerfiles are the source of truth for a build:
+# scripts/check-versions.sh fails when this file disagrees with them.
+
+interop_version: "0.1.0"
+contract_version: "1.0"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
+fixture_schema: "1.0"          # fixtures/schema/modbus-fixture.schema.json
+
+protocol:
+  name: "Modbus TCP"
+  default_port: 1502           # inside the images; the registered port 502 needs root
+
+implementations:
+  libmodbus:
+    priority: P0
+    upstream: "libmodbus"
+    repository: "https://github.com/stephane/libmodbus"
+    version: "v3.2.0"
+    revision: "a9b025d12289855490b10d77461c99e001abfc0f"
+    license: "LGPL-2.1-or-later"
+    bundled:
+      cjson: "1.7.18-3.1+deb13u1"   # Debian libcjson1, MIT; ARG CJSON_VERSION
+    language: "C"
+    independent_engine: true
+    roles: [server, client]
+
+  pymodbus:
+    priority: P0
+    upstream: "PyModbus"
+    repository: "https://github.com/pymodbus-dev/pymodbus"
+    artifact: "pypi:pymodbus"
+    version: "3.15.0"
+    revision: "39949d726efa67411a4feed664736de05c073f16"   # tag v3.15.0; information, the build installs the wheel
+    wheel_sha256: "74d8dee961f23845f18a8481253183504dca05c4fcd102890cd28f4d7ce09267"
+    license: "BSD-3-Clause"
+    language: "Python"
+    independent_engine: true
+    roles: [server, client]
+
+  digitalpetri:
+    priority: P0
+    upstream: "digitalpetri/modbus"
+    repository: "https://github.com/digitalpetri/modbus"
+    artifact: "com.digitalpetri.modbus:modbus-tcp"
+    version: "2.1.6"
+    revision: "0599935194c38c54c540293de2501ad3fe47da50"   # tag v2.1.6; information, the build fetches Maven artifacts
+    minimum: "2.1.6"             # the raw request hooks the adapter uses are new in this release
+    license: "EPL-2.0"
+    language: "Java"
+    independent_engine: true
+    roles: [server, client]
+
+  nmodbus:
+    priority: P1
+    upstream: "NModbus"
+    repository: "https://github.com/NModbus/NModbus"
+    artifact: "nuget:NModbus"
+    version: "3.0.83"
+    revision: "d96e7707a08cebe7f436087e7d575c930963d91a"
+    license: "MIT"
+    language: "C#"
+    independent_engine: true
+    roles: [server, client]
+
+  tokiomodbus:
+    priority: P1
+    upstream: "tokio-modbus"
+    repository: "https://github.com/slowtec/tokio-modbus"
+    artifact: "crates.io:tokio-modbus"
+    version: "0.17.0"
+    revision: "dd151a6a10a9e74bb7c982578aed21413562dc5a"   # from the crate's .cargo_vcs_info.json; information
+    crate_sha256: "95d06136e737e962c71d922a09148f5a264f6609a021fdf031ad16ffd172c818"
+    license: "MIT OR Apache-2.0"
+    language: "Rust"
+    independent_engine: true
+    roles: [server, client]
+
+base_images:
+  # Multi-arch index digests. Each adapter Dockerfile names them as *_DIGEST
+  # build arguments.
+  debian:
+    image: "docker.io/library/debian:trixie-slim"
+    digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
+    used_by: [libmodbus, tokiomodbus]
+  python:
+    image: "docker.io/library/python:3.14.8-slim-trixie"
+    digest: "sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170"
+    used_by: [pymodbus]
+  maven:
+    image: "docker.io/library/maven:3.9.16-eclipse-temurin-25-noble"
+    digest: "sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976"
+    used_by: [digitalpetri]
+  jre:
+    image: "docker.io/library/eclipse-temurin:25.0.4.1_1-jre-noble"
+    digest: "sha256:d9a39a23634650173f1e2bbc176227af9728587ecf0f4b62d53e9355cd7a19ab"
+    used_by: [digitalpetri]
+  dotnet_sdk:
+    image: "mcr.microsoft.com/dotnet/sdk:10.0.401-noble"
+    digest: "sha256:e70cdb7f80b0348f5cb85f19a8f670fca061f033d57eed12fa003d58b0e06317"
+    used_by: [nmodbus]
+  dotnet_runtime:
+    image: "mcr.microsoft.com/dotnet/runtime:10.0.12-alpine3.24"
+    digest: "sha256:c13f5945240d31ae6cdc99e2c7d48c355d3e78bc98ef1415e9482ce193eef32e"
+    used_by: [nmodbus]
+  rust:
+    image: "docker.io/library/rust:1.99.0-slim-trixie"
+    digest: "sha256:2752b332db73fdbb7dc576f06c82ed1f312005784ef913d7e04a28f5f55dc581"
+    used_by: [tokiomodbus]
+
+images:
+  libmodbus: "ghcr.io/otfabric/modbus-interop-libmodbus"
+  pymodbus: "ghcr.io/otfabric/modbus-interop-pymodbus"
+  digitalpetri: "ghcr.io/otfabric/modbus-interop-digitalpetri"
+  nmodbus: "ghcr.io/otfabric/modbus-interop-nmodbus"
+  tokiomodbus: "ghcr.io/otfabric/modbus-interop-tokiomodbus"
+
+platforms:
+  - "linux/amd64"
+  - "linux/arm64"

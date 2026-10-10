@@ -1,0 +1,8 @@
+.git
+.github
+reports
+**/target
+**/build
+**/bin
+**/obj
+**/__pycache__

@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MIT
+#
+# modbus-interop adapter for tokio-modbus.
+#
+# Every direct dependency is pinned to an exact version and Cargo.lock pins
+# the whole graph with checksums; the image is built with --locked.
+# The tokio-modbus line below is the upstream pin: it must stay on one line in
+# this exact form, because the Dockerfile reads it (and rewrites it for a
+# candidate build, see UPSTREAM_VERSION there).
+
+[package]
+name = "modbus-interop-tokiomodbus"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "modbus-interop reference adapter built on tokio-modbus"
+
+[[bin]]
+name = "modbus-interop"
+path = "src/main.rs"
+
+[dependencies]
+tokio-modbus = { version = "=0.17.0", default-features = false, features = ["tcp", "tcp-server"] }
+tokio = { version = "=1.53.2", default-features = false, features = ["rt", "rt-multi-thread", "net", "time", "signal", "sync", "io-util"] }
+serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }
+
+[profile.release]
+# The default panic strategy (unwind) is required: tokio-modbus 0.17.0 panics
+# while decoding some malformed requests, and unwinding confines that to the
+# task of the one connection. Do not set panic = "abort".
+strip = true

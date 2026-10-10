@@ -1,0 +1,32 @@
+<!-- SPDX-License-Identifier: MIT -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>modbus-interop</AssemblyName>
+    <RootNamespace>ModbusInterop.NModbusAdapter</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <!-- Portable IL started by the "dotnet" host of the runtime image: nothing
+         in the build depends on the processor architecture. -->
+    <UseAppHost>false</UseAppHost>
+    <TieredPGO>false</TieredPGO>
+    <!-- packages.lock.json pins the restore graph with content hashes. The
+         Dockerfile restores with locked-mode at the pin. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- The upstream pin. The Dockerfile passes UPSTREAM_VERSION here. -->
+    <NModbusVersion Condition="'$(NModbusVersion)' == ''">3.0.83</NModbusVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- "[x]" is an exact-version range. NModbus has no dependencies on this
+         target framework. -->
+    <PackageReference Include="NModbus" Version="[$(NModbusVersion)]" />
+  </ItemGroup>
+</Project>

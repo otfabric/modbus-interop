@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/modbus-interop/schemas/capabilities.schema.json",
+  "title": "modbus-interop capability document",
+  "description": "Output of 'print-capabilities'. See docs/CAPABILITIES.md.",
+  "type": "object",
+  "required": ["schemaVersion", "adapter", "adapterVersion", "protocol", "upstream", "roles", "features",
+               "serverFunctions", "clientOperations"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "adapter": { "type": "string", "pattern": "^[a-z0-9]+$" },
+    "adapterVersion": { "type": "string", "minLength": 1 },
+    "protocol": { "const": "modbus-tcp" },
+    "upstream": {
+      "type": "object",
+      "required": ["name", "version", "revision", "license", "language", "independentEngine"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "revision": { "type": "string" },
+        "license": { "type": "string" },
+        "language": { "type": "string" },
+        "independentEngine": { "type": "boolean" }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "required": ["server", "client"],
+      "properties": { "server": { "type": "boolean" }, "client": { "type": "boolean" } }
+    },
+    "features": {
+      "type": "object",
+      "required": ["serverUnitIdFiltering", "serverQuantityCheck", "serverMaskWrite", "serverReadWriteMultiple",
+                   "serverDeviceIdentification", "requestEvents", "connectionEvents", "clientMaskWrite",
+                   "clientReadWriteMultiple", "clientDeviceIdentification", "clientRaw", "clientRepeat",
+                   "clientUnitIdCheck"],
+      "additionalProperties": { "type": "boolean" }
+    },
+    "serverFunctions": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 127 } },
+    "clientOperations": {
+      "type": "array",
+      "items": {
+        "enum": ["read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
+                 "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
+                 "mask-write-register", "read-write-multiple-registers", "read-device-identification", "raw"]
+      }
+    }
+  }
+}

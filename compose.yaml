@@ -1,0 +1,49 @@
+# Reference servers for local work. Ports are published on loopback only:
+# these are unauthenticated Modbus TCP devices that accept writes from anyone
+# who can reach them, and must not be reachable from a plant network.
+#
+#   docker compose up -d --wait        # every server, waits for readiness
+#   docker compose down
+#
+# MODBUS_INTEROP_VERSION selects the image tag (default: dev, the local build).
+
+x-server: &server
+  command: ["server", "--fixture", "/fixtures/${MODBUS_INTEROP_FIXTURE:-baseline}/fixture.json"]
+  healthcheck:
+    test: ["CMD", "test", "-f", "/run/modbus-interop/ready"]
+    interval: 2s
+    timeout: 2s
+    retries: 15
+    start_period: 10s
+  stop_grace_period: 10s
+
+services:
+  libmodbus:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-libmodbus:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1502:1502"
+
+  pymodbus:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-pymodbus:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1503:1502"
+
+  digitalpetri:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-digitalpetri:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1504:1502"
+
+  nmodbus:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-nmodbus:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1505:1502"
+
+  tokiomodbus:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-tokiomodbus:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1506:1502"

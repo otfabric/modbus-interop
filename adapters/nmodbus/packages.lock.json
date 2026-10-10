@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "NModbus": {
+        "type": "Direct",
+        "requested": "[3.0.83, 3.0.83]",
+        "resolved": "3.0.83",
+        "contentHash": "DLqEobLC168wE1t4xHyEEFfj/IkX2Kx7w8PaNgaipb/8B7DSHMUlXi/TLJfD8EYS5rN0ENInhyOCC5U0wadtuQ=="
+      }
+    }
+  }
+}

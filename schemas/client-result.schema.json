@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/modbus-interop/schemas/client-result.schema.json",
+  "title": "modbus-interop client result document",
+  "description": "The single line a 'client' operation prints. See docs/CONTAINER_CONTRACT.md.",
+  "type": "object",
+  "required": ["schemaVersion", "adapter", "operation", "ok", "error", "connected", "unitId", "requests",
+               "responses", "response", "exception", "elapsedMs"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "adapter": { "type": "string" },
+    "operation": {
+      "enum": ["read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
+               "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
+               "mask-write-register", "read-write-multiple-registers", "read-device-identification", "raw"]
+    },
+    "ok": { "type": "boolean" },
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "enum": ["connect-failed", "exception", "timeout", "connection-lost", "invalid-response", "failed"] },
+            "message": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "connected": { "type": "boolean" },
+    "unitId": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "requests": { "type": "integer", "minimum": 0 },
+    "responses": { "type": "integer", "minimum": 0 },
+    "response": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["function"],
+          "properties": {
+            "function": { "type": "integer", "minimum": 1, "maximum": 127 },
+            "bits": { "type": "array", "items": { "type": "boolean" } },
+            "registers": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 65535 } },
+            "address": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "quantity": { "type": "integer", "minimum": 1 },
+            "value": { "type": ["boolean", "integer"] },
+            "andMask": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "orMask": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "conformityLevel": { "type": "integer" },
+            "objects": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "value"],
+                "properties": { "id": { "type": "integer", "minimum": 0, "maximum": 255 }, "value": { "type": "string" } }
+              }
+            },
+            "data": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+          }
+        }
+      ]
+    },
+    "exception": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["function", "code"],
+          "properties": {
+            "function": { "type": "integer", "minimum": 129, "maximum": 255 },
+            "code": { "type": "integer", "minimum": 1, "maximum": 255 }
+          }
+        }
+      ]
+    },
+    "elapsedMs": { "type": "number", "minimum": 0 }
+  },
+  "allOf": [
+    { "if": { "properties": { "ok": { "const": true } } }, "then": { "properties": { "error": { "type": "null" }, "exception": { "type": "null" }, "response": { "type": "object" } } } },
+    { "if": { "properties": { "ok": { "const": false } } }, "then": { "properties": { "error": { "type": "object" } } } }
+  ]
+}
