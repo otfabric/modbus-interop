@@ -34,6 +34,44 @@
           }
         }
       }
+    },
+    "reportServerId": {
+      "description": "FC17: a one-byte server ID and the run indicator; the response carries no additional data.",
+      "type": "object",
+      "required": ["serverId", "runIndicator"],
+      "additionalProperties": false,
+      "properties": {
+        "serverId": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "runIndicator": { "type": "boolean" }
+      }
+    },
+    "fileRecords": {
+      "description": "FC20/FC21: files of registers; a record number is the index in records.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["file", "records"],
+        "additionalProperties": false,
+        "properties": {
+          "file": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "records": { "type": "array", "minItems": 1, "maxItems": 10000, "items": { "type": "integer", "minimum": 0, "maximum": 65535 } }
+        }
+      }
+    },
+    "fifoQueues": {
+      "description": "FC24: FIFO queues by FIFO pointer address, oldest value first.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["address", "values"],
+        "additionalProperties": false,
+        "properties": {
+          "address": { "$ref": "#/$defs/address" },
+          "values": { "type": "array", "maxItems": 31, "items": { "type": "integer", "minimum": 0, "maximum": 65535 } }
+        }
+      }
     }
   },
   "$defs": {

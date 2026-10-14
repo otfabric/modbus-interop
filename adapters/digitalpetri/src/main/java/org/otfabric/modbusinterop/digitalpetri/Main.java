@@ -146,6 +146,19 @@ public final class Main {
         features.addProperty("clientRepeat", true);
         // The library matches a response to its request by transaction identifier only.
         features.addProperty("clientUnitIdCheck", false);
+        // No PDUs for FC08, FC17, FC20, FC21 or FC24 on either side: the server answers them
+        // with exception 1 and the client refuses the operations.
+        features.addProperty("serverDiagnostics", false);
+        features.addProperty("serverReportServerId", false);
+        features.addProperty("serverFileRecord", false);
+        features.addProperty("serverFifoQueue", false);
+        features.addProperty("clientDiagnostics", false);
+        features.addProperty("clientReportServerId", false);
+        features.addProperty("clientReadFileRecord", false);
+        features.addProperty("clientWriteFileRecord", false);
+        features.addProperty("clientFifoQueue", false);
+        // sendRawAsync frames the response by the MBAP length and hands back the PDU untouched.
+        features.addProperty("clientRawAnyResponse", true);
 
         JsonArray functions = new JsonArray();
         for (int function : Device.FUNCTIONS) {

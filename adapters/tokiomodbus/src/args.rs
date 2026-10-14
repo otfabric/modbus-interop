@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::time::Duration;
 
-pub const OPERATIONS: [&str; 12] = [
+pub const OPERATIONS: [&str; 13] = [
     "read-coils",
     "read-discrete-inputs",
     "read-holding-registers",
@@ -21,8 +21,14 @@ pub const OPERATIONS: [&str; 12] = [
     "mask-write-register",
     "read-write-multiple-registers",
     "read-device-identification",
+    "report-server-id",
     "raw",
 ];
+
+/// Operations of the contract that tokio-modbus has no request type for:
+/// sending them would mean encoding and decoding the PDU in the adapter.
+/// They are refused like an unknown operation (exit 2, nothing sent).
+const REFUSED: [&str; 4] = ["diagnostics", "read-file-record", "write-file-record", "read-fifo-queue"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Category {
@@ -44,6 +50,7 @@ pub enum Op {
     MaskWriteRegister { address: u16, and_mask: u16, or_mask: u16 },
     ReadWriteMultipleRegisters { read_address: u16, read_quantity: u16, write_address: u16, values: Vec<u16> },
     ReadDeviceIdentification { category: Category },
+    ReportServerId,
     Raw { function: u8, data: Vec<u8> },
 }
 
@@ -62,6 +69,7 @@ impl Op {
             Op::MaskWriteRegister { .. } => 22,
             Op::ReadWriteMultipleRegisters { .. } => 23,
             Op::ReadDeviceIdentification { .. } => 43,
+            Op::ReportServerId => 17,
             Op::Raw { function, .. } => *function,
         }
     }
@@ -195,6 +203,7 @@ fn operation_flags(operation: &str) -> Option<&'static [&'static str]> {
         "mask-write-register" => &["address", "and-mask", "or-mask"],
         "read-write-multiple-registers" => &["read-address", "read-quantity", "write-address", "values"],
         "read-device-identification" => &["category"],
+        "report-server-id" => &[],
         "raw" => &["function", "data"],
         _ => return None,
     })
@@ -203,6 +212,9 @@ fn operation_flags(operation: &str) -> Option<&'static [&'static str]> {
 /// `client <operation> ...`: `args` starts at the operation.
 pub fn client(args: &[String]) -> Result<ClientConfig, String> {
     let operation = args.first().ok_or_else(|| "client needs an operation".to_string())?;
+    if REFUSED.contains(&operation.as_str()) {
+        return Err(format!("operation {operation:?} is not supported: tokio-modbus has no request type for it"));
+    }
     let own = operation_flags(operation).ok_or_else(|| format!("unknown operation {operation:?}"))?;
     let allowed: Vec<&str> = COMMON.iter().chain(own.iter()).copied().collect();
     let flags = Flags::parse(&args[1..], &allowed)?;
@@ -264,6 +276,7 @@ pub fn client(args: &[String]) -> Result<ClientConfig, String> {
                 Some(other) => return Err(format!("--category must be basic, regular or extended, got {other:?}")),
             },
         },
+        "report-server-id" => Op::ReportServerId,
         "raw" => {
             let data = hex_bytes(flags.text("data")?)
                 .ok_or_else(|| "--data must be an even number of hexadecimal digits".to_string())?;

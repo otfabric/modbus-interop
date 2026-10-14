@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **1.0** (`contract_version` in [versions.yaml](../versions.yaml))
+Version: **1.1** (`contract_version` in [versions.yaml](../versions.yaml))
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes. Consumers depend on this document, not on any adapter's source. A
@@ -11,6 +11,7 @@ and changes only with the major version.
 | Version | Change |
 |---------|--------|
 | 1.0 | First release |
+| 1.1 | Operations `diagnostics` (FC08), `report-server-id` (FC17), `read-file-record` (FC20), `write-file-record` (FC21) and `read-fifo-queue` (FC24); the response fields `subFunction`, `file` and `record`; the features for them and `clientRawAnyResponse` ([CAPABILITIES.md](CAPABILITIES.md)); the fixture fields `reportServerId`, `fileRecords` and `fifoQueues` ([FIXTURES.md](FIXTURES.md)). Documents still carry `schemaVersion` `"1.0"` |
 
 Not every adapter has every operation or event. What an image lacks it says
 in [`print-capabilities`](#print-capabilities), and an operation it does not
@@ -111,6 +112,7 @@ A `request` event describes one request and how it was answered:
 | `bits`, `registers` | What a write carried: `bits` for FC05 and FC15, `registers` for FC06 and FC16 |
 | `andMask`, `orMask` | FC22 |
 | `writeAddress`, `writeRegisters` | FC23: the write part |
+| | FC08, FC17, FC20, FC21 and FC24 events carry only `unitId`, `function` and `exception` |
 | `exception` | `null` when the request was answered normally, otherwise the exception code sent |
 
 A request that is not answered at all (a malformed frame) produces no event.
@@ -154,6 +156,11 @@ connection.
 | `mask-write-register` | 22 | `--address N`, `--and-mask N`, `--or-mask N`. Only with the feature `clientMaskWrite` |
 | `read-write-multiple-registers` | 23 | `--read-address N`, `--read-quantity N` (1..125), `--write-address N`, `--values N,N,...` (1..121). Only with the feature `clientReadWriteMultiple` |
 | `read-device-identification` | 43/14 | `--category C`: `basic` (default), `regular` or `extended`. Stream access starting at object 0; the client follows "more follows" until it has the whole category. Only with the feature `clientDeviceIdentification` |
+| `diagnostics` | 08 | `--sub-function N` (0..65535), `--data HEX` (the data after the sub-function, may be empty). Only with the feature `clientDiagnostics` |
+| `report-server-id` | 17 | none. Only with the feature `clientReportServerId` |
+| `read-file-record` | 20 | `--file N` (1..65535), `--record N` (0..9999), `--length N` (1..121 registers): one sub-request, reference type 6. Only with the feature `clientReadFileRecord` |
+| `write-file-record` | 21 | `--file N` (1..65535), `--record N` (0..9999), `--values N,N,...` (1..122): one sub-request, reference type 6. Only with the feature `clientWriteFileRecord` |
+| `read-fifo-queue` | 24 | `--address N`, the FIFO pointer address. Only with the feature `clientFifoQueue` |
 | `raw` | any | `--function N` (1..127), `--data HEX` (the request PDU after the function code, may be empty). Only with the feature `clientRaw` |
 
 Addresses are 0..65535 and are the numbers on the wire, not 1-based
@@ -202,6 +209,10 @@ past argument parsing, including failures.
 | 06 | `address`, `value` (0..65535) |
 | 15, 16 | `address`, `quantity` |
 | 22 | `address`, `andMask`, `orMask` |
+| 08 | `subFunction`, `data`: the data after the sub-function, lower-case hex |
+| 17 | `data`: the bytes after the byte count (server ID, run indicator, additional data), lower-case hex |
+| 20, 24 | `registers`: array of numbers 0..65535 (for FC20 the record data of the one sub-request) |
+| 21 | `file`, `record`, `quantity` (number of registers written) |
 | 43 | `conformityLevel` (number), `objects`: array of `{ "id", "value" }` in ascending `id`, `value` being the object as a string |
 | `raw` | `data`: the response PDU after the function code, lower-case hex |
 

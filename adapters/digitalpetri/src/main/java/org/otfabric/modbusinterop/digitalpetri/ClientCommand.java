@@ -34,6 +34,7 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -45,7 +46,19 @@ import java.util.concurrent.TimeoutException;
 /** {@code client}: one bounded operation, one result document. */
 final class ClientCommand {
 
-    /** Read Device Identification is absent: the library has no FC43. */
+    /**
+     * The operations of the contract the library has no PDU for, with their function code: they
+     * are usage errors and nothing is sent (REQUIREMENTS.md R2.4, no codecs in the adapter).
+     */
+    private static final Map<String, Integer> MISSING = Map.of(
+            "read-device-identification", 43,
+            "diagnostics", 8,
+            "report-server-id", 17,
+            "read-file-record", 20,
+            "write-file-record", 21,
+            "read-fifo-queue", 24);
+
+    /** The operations the library has; FC08, FC17, FC20, FC21, FC24 and FC43 are absent. */
     static final List<String> OPERATIONS = List.of(
             "read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
             "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
@@ -89,9 +102,10 @@ final class ClientCommand {
             throw new Args.UsageException("client needs an operation: " + String.join(", ", OPERATIONS));
         }
         String operation = tokens.get(0);
-        if (operation.equals("read-device-identification")) {
+        Integer missing = MISSING.get(operation);
+        if (missing != null) {
             throw new Args.UsageException(
-                    "read-device-identification is not supported: digitalpetri/modbus has no function 43");
+                    operation + " is not supported: digitalpetri/modbus has no function " + missing);
         }
         Set<String> flags = new HashSet<>(COMMON);
         flags.addAll(switch (operation) {

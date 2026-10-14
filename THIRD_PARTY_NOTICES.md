@@ -34,7 +34,7 @@ Licence texts in the image: `/licenses/libmodbus/COPYING.LESSER` with
 
 | Component | Version | Licence | Source |
 |-----------|---------|---------|--------|
-| PyModbus | 3.15.0 (wheel `sha256:74d8dee961f23845f18a8481253183504dca05c4fcd102890cd28f4d7ce09267`) | BSD-3-Clause | https://github.com/pymodbus-dev/pymodbus |
+| PyModbus | 3.16.1 (wheel `sha256:bb433f7417280bdea1190d95495aa6fb8e1fa8e0d720c436922b270bc378024c`) | BSD-3-Clause | https://github.com/pymodbus-dev/pymodbus |
 | CPython | 3.14.8 | PSF-2.0 | https://www.python.org |
 | Adapter | this repository, `adapters/pymodbus/` | MIT | https://github.com/otfabric/modbus-interop |
 | Base system | Debian trixie-slim (python image) | various; see `/usr/share/doc/*/copyright` in the image | https://www.debian.org |

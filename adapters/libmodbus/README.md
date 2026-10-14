@@ -49,7 +49,7 @@ because the library would do something the fixture rules do not allow:
 | Request | libmodbus on its own | Adapter |
 |---------|----------------------|---------|
 | Another unit identifier | answers it (no filtering on TCP) | `modbus_reply_exception()` with exception 11 |
-| FC17 Report Server ID | answers with `LMB3.2.0` | `modbus_reply_exception()` with exception 1 |
+| FC17 Report Server ID | answers with its own identity (server ID 0xB4, run indicator 0xFF, `LMB3.2.0`), not the fixture's `reportServerId` | `modbus_reply_exception()` with exception 1 |
 | Function code 0 or above 127 | answers with the function code plus 128, truncated to a byte (read in its source, not observed) | not answered |
 
 Up to 64 connections are served at a time (`select()` and one thread); a 65th
@@ -77,6 +77,7 @@ application would make:
 | `write-multiple-coils`, `write-multiple-registers` | `modbus_write_bits`, `modbus_write_registers` |
 | `mask-write-register` | `modbus_mask_write_register` |
 | `read-write-multiple-registers` | `modbus_write_and_read_registers` |
+| `report-server-id` | `modbus_report_slave_id`; `data` is the bytes after the byte count |
 | `raw` | `modbus_send_raw_request` + `modbus_receive_confirmation` |
 
 - **Timeouts.** libmodbus has no connect timeout: `modbus_connect()` waits for
@@ -104,6 +105,10 @@ application would make:
 |---------|-------|-----|
 | `serverDeviceIdentification` | false | libmodbus has no FC43; `modbus_reply()` answers exception 1. Not re-implemented in the adapter |
 | `clientDeviceIdentification` | false | No API. `raw` cannot stand in: of a response to a function it does not know, libmodbus reads one byte and leaves the rest (see below). `read-device-identification` is a usage error (exit 2) |
+| `serverReportServerId` | false | `modbus_reply()` answers FC17 with the library's fixed identity, which cannot follow the fixture; the adapter answers exception 1 |
+| `serverDiagnostics`, `serverFileRecord`, `serverFifoQueue` | false | `modbus_reply()` answers FC08, FC20, FC21 and FC24 with exception 1. The fixture's `fileRecords` and `fifoQueues` are validated but not served |
+| `clientDiagnostics`, `clientReadFileRecord`, `clientWriteFileRecord`, `clientFifoQueue` | false | No API, and the library cannot receive the normal responses of FC08, FC20, FC21 and FC24. `diagnostics`, `read-file-record`, `write-file-record` and `read-fifo-queue` are usage errors (exit 2), nothing is sent |
+| `clientRawAnyResponse` | false | `raw` receives exception responses and the normal responses of the functions libmodbus frames (see below) only |
 | `clientUnitIdCheck` | false | The TCP backend compares the transaction and protocol identifiers of a response, not its unit identifier (`EMBBADSLAVE` exists for RTU only). Verified: a response from unit 2 to a request for unit 1 is accepted. Only `raw`, where the adapter does the checks, rejects it |
 
 Limits within what is declared:
@@ -113,7 +118,7 @@ Limits within what is declared:
   knows FC01..FC07, FC15..FC17, FC22, FC23 and exception responses. For any
   other function it reads one byte after the function code; the adapter
   notices that the MBAP header announced more and reports `failed` instead of
-  a truncated PDU. A raw request carries at most 252 bytes of data.
+  a truncated PDU, and flushes what is left on the socket. A raw request carries at most 252 bytes of data.
 - **Exception codes above 11** in a response to a typed operation are
   `invalid-response` (`EMBBADEXC`): the library does not hand out the code.
   `raw` reports them.

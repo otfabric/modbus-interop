@@ -1,23 +1,31 @@
 # modbus-interop Releases
 
-## How a release is made
+## v0.2.0
 
-1. `make ci` on the commit to release.
-2. Update `interop_version` in `versions.yaml` and the notes below.
-3. Tag `vX.Y.Z` and push the tag. The release workflow runs one job on an amd64 runner and one on an arm64 runner: each validates, builds every image natively with `ADAPTER_VERSION` set to the tag, runs the smoke and cross-stack self-tests on those images and pushes exactly them to GHCR as `<image>:vX.Y.Z-amd64` and `-arm64`. A last job joins the two into the multi-arch `<image>:vX.Y.Z` and creates the GitHub release with `manifest.json` (upstream pins and the digests of the multi-arch images) and `checksums.txt`.
-4. Consumers pin the digests from `manifest.json`.
+## Summary
 
-Tags are immutable. A fix is a new version.
+Contract 1.1: Diagnostics (FC08 Return Query Data), Report Server ID (FC17), Read and Write File Record (FC20, FC21) and Read FIFO Queue (FC24) as client operations and server behaviour, on the stacks that have them, and PyModbus 3.16.1.
 
-| What changed | Version |
-|--------------|---------|
-| Contract or fixture format changed incompatibly | major |
-| New operation, behaviour, fixture, adapter or document field | minor |
-| Upstream pin, base image or bug fix with unchanged contract | patch |
+## Changes
+
+### Added
+
+- **Client operations** `diagnostics`, `report-server-id`, `read-file-record`, `write-file-record` and `read-fifo-queue`, with the response fields `subFunction`, `file` and `record` ([docs/CONTAINER_CONTRACT.md](docs/CONTAINER_CONTRACT.md)).
+- **Features** `serverDiagnostics`, `serverReportServerId`, `serverFileRecord`, `serverFifoQueue`, `clientDiagnostics`, `clientReportServerId`, `clientReadFileRecord`, `clientWriteFileRecord`, `clientFifoQueue`, and `clientRawAnyResponse`: whether `raw` can receive the normal response of any function code (libmodbus frames responses by function code and cannot) ([docs/CAPABILITIES.md](docs/CAPABILITIES.md)).
+- **Fixture fields** `reportServerId`, `fileRecords` and `fifoQueues`, and the behaviour of the device for these functions ([docs/FIXTURES.md](docs/FIXTURES.md)). The baseline fixture has server ID 42, two files and three FIFO queues.
+- **Self-tests**: cases for every new operation, raw PDUs for FC08, FC20 and FC24, values compared with the fixture, and an FC21 write read back with FC20 on another connection.
+
+### Changed
+
+- **PyModbus 3.15.0 → 3.16.1.** 3.16.1 fixes the client's FC17 decoding, which took the run indicator into the server ID.
+
+### Support per stack
+
+See the capability matrix in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). PyModbus serves and sends all five functions; the other stacks only what their library offers typed (FC17 in libmodbus's client and in tokio-modbus, FC08 in the NModbus server, FC21 in the NModbus client). digitalpetri/modbus 2.1.6 has none of them. Every other server answers them with exception 1, and `raw` reaches them from every client.
 
 ---
 
-## Unreleased (planned v0.1.0)
+## v0.1.0
 
 ## Summary
 

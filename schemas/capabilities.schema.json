@@ -33,7 +33,9 @@
       "required": ["serverUnitIdFiltering", "serverQuantityCheck", "serverMaskWrite", "serverReadWriteMultiple",
                    "serverDeviceIdentification", "requestEvents", "connectionEvents", "clientMaskWrite",
                    "clientReadWriteMultiple", "clientDeviceIdentification", "clientRaw", "clientRepeat",
-                   "clientUnitIdCheck"],
+                   "clientUnitIdCheck", "serverDiagnostics", "serverReportServerId", "serverFileRecord",
+                   "serverFifoQueue", "clientDiagnostics", "clientReportServerId", "clientReadFileRecord",
+                   "clientWriteFileRecord", "clientFifoQueue", "clientRawAnyResponse"],
       "additionalProperties": { "type": "boolean" }
     },
     "serverFunctions": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 127 } },
@@ -42,7 +44,8 @@
       "items": {
         "enum": ["read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
                  "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
-                 "mask-write-register", "read-write-multiple-registers", "read-device-identification", "raw"]
+                 "mask-write-register", "read-write-multiple-registers", "read-device-identification", "diagnostics",
+                 "report-server-id", "read-file-record", "write-file-record", "read-fifo-queue", "raw"]
       }
     }
   }

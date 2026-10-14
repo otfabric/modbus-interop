@@ -43,12 +43,28 @@ static int print_capabilities(void)
         /* The TCP backend of libmodbus does not compare the unit identifier
            of a response with that of the request. */
         {"clientUnitIdCheck", 0},
+        /* The FC17 answer of libmodbus is its own fixed identity, not that of
+           the fixture, so the server answers FC17 with exception 1. FC08,
+           FC20, FC21 and FC24 it does not implement. */
+        {"serverDiagnostics", 0},
+        {"serverReportServerId", 0},
+        {"serverFileRecord", 0},
+        {"serverFifoQueue", 0},
+        /* Of these the client library has modbus_report_slave_id() only. */
+        {"clientDiagnostics", 0},
+        {"clientReportServerId", 1},
+        {"clientReadFileRecord", 0},
+        {"clientWriteFileRecord", 0},
+        {"clientFifoQueue", 0},
+        /* libmodbus frames a response by its function code: raw cannot
+           receive the normal response of a function it does not know. */
+        {"clientRawAnyResponse", 0},
     };
     static const int functions[] = {1, 2, 3, 4, 5, 6, 15, 16, 22, 23};
     static const char *const operations[] = {
         "read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
         "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
-        "mask-write-register", "read-write-multiple-registers", "raw"};
+        "mask-write-register", "read-write-multiple-registers", "report-server-id", "raw"};
     cJSON *doc = cJSON_CreateObject();
     cJSON *upstream, *roles, *list;
 

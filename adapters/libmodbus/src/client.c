@@ -7,6 +7,11 @@
  * failure through errno only, so the result is built from the request and
  * from errno: an exception response is EMBXILFUN..EMBXGTAR.
  *
+ * FC17 is modbus_report_slave_id(). libmodbus has no call for FC08, FC20,
+ * FC21 and FC24, and cannot even receive their normal responses (it takes
+ * the length of a response from its function code), so those operations
+ * are refused before anything is sent.
+ *
  * "raw" uses modbus_send_raw_request() and modbus_receive_confirmation().
  * The latter does not compare the response with the request, so this file
  * does: transaction, protocol and unit identifier, length and function code.
@@ -36,6 +41,7 @@ typedef enum {
     OP_WRITE_MULTIPLE_REGISTERS,
     OP_MASK_WRITE_REGISTER,
     OP_READ_WRITE_MULTIPLE_REGISTERS,
+    OP_REPORT_SERVER_ID,
     OP_RAW
 } op_id_t;
 
@@ -58,7 +64,20 @@ static const op_def_t OPERATIONS[] = {
     {"mask-write-register", OP_MASK_WRITE_REGISTER, MODBUS_FC_MASK_WRITE_REGISTER, "address and-mask or-mask"},
     {"read-write-multiple-registers", OP_READ_WRITE_MULTIPLE_REGISTERS, MODBUS_FC_WRITE_AND_READ_REGISTERS,
      "read-address read-quantity write-address values"},
+    {"report-server-id", OP_REPORT_SERVER_ID, MODBUS_FC_REPORT_SLAVE_ID, ""},
     {"raw", OP_RAW, 0, "function data"},
+};
+
+/* Operations of the contract that libmodbus has no call for. */
+static const struct {
+    const char *name;
+    const char *what;
+} UNSUPPORTED[] = {
+    {"read-device-identification", "Read Device Identification (FC43/14)"},
+    {"diagnostics", "Diagnostics (FC08)"},
+    {"read-file-record", "Read File Record (FC20)"},
+    {"write-file-record", "Write File Record (FC21)"},
+    {"read-fifo-queue", "Read FIFO Queue (FC24)"},
 };
 
 static const char COMMON_FLAGS[] = "host port unit-id connect-timeout-ms timeout-ms repeat";
@@ -205,8 +224,13 @@ static int parse_arguments(int argc, char **argv, request_t *rq)
 
     if (argc < 1)
         return usage("missing operation%s", NULL);
-    if (!strcmp(argv[0], "read-device-identification"))
-        return usage("%s is not supported: libmodbus has no Read Device Identification (FC43/14)", argv[0]);
+    for (size_t i = 0; i < sizeof(UNSUPPORTED) / sizeof(UNSUPPORTED[0]); i++) {
+        if (!strcmp(argv[0], UNSUPPORTED[i].name)) {
+            fprintf(stderr, "modbus-interop client: %s is not supported: libmodbus has no %s\n", argv[0],
+                    UNSUPPORTED[i].what);
+            return EXIT_USAGE;
+        }
+    }
     for (size_t i = 0; i < sizeof(OPERATIONS) / sizeof(OPERATIONS[0]); i++) {
         if (!strcmp(argv[0], OPERATIONS[i].name))
             op = &OPERATIONS[i];
@@ -294,6 +318,7 @@ static int parse_arguments(int argc, char **argv, request_t *rq)
             return EXIT_USAGE;
         break;
     case OP_MASK_WRITE_REGISTER:
+    case OP_REPORT_SERVER_ID:
         break;
     case OP_READ_WRITE_MULTIPLE_REGISTERS:
         if (number_flag(&flags, "read-quantity", 1, MODBUS_MAX_WR_READ_REGISTERS, &rq->quantity) != 0 ||
@@ -401,7 +426,10 @@ static void exchange_raw(modbus_t *ctx, const request_t *rq, outcome_t *out)
     if (announced > length) {
         /* libmodbus takes the length of a response from the function code,
            not from the MBAP header: of a function it does not know it reads
-           one byte of data and leaves the rest on the socket. */
+           one byte of data and leaves the rest on the socket. Drop the rest,
+           so that nothing of it can be taken for a later response (the
+           repeat loop also stops at this failure). */
+        modbus_flush(ctx);
         out->error = "failed";
         snprintf(out->message, sizeof(out->message),
                  "libmodbus cannot receive the response of function %d: it read %d of %d bytes", function,
@@ -423,6 +451,8 @@ static void exchange_raw(modbus_t *ctx, const request_t *rq, outcome_t *out)
 static void exchange(modbus_t *ctx, const request_t *rq, outcome_t *out)
 {
     static uint8_t bits[MODBUS_MAX_READ_BITS];
+    uint8_t id[MODBUS_MAX_PDU_LENGTH];
+    char hex[2 * MODBUS_MAX_PDU_LENGTH + 1];
     uint16_t registers[MODBUS_MAX_READ_REGISTERS];
     const int function = rq->op->function;
     const int address = (int) rq->address;
@@ -469,6 +499,11 @@ static void exchange(modbus_t *ctx, const request_t *rq, outcome_t *out)
         rc = modbus_write_and_read_registers(ctx, (int) rq->write_address, rq->value_count, rq->values, address,
                                              quantity, registers);
         break;
+    case OP_REPORT_SERVER_ID:
+        /* Returns the byte count and copies at most sizeof(id) of the
+           bytes after it. */
+        rc = modbus_report_slave_id(ctx, (int) sizeof(id), id);
+        break;
     }
     if (rc == -1) {
         outcome_from_errno(out, function, errno);
@@ -510,6 +545,12 @@ static void exchange(modbus_t *ctx, const request_t *rq, outcome_t *out)
         cJSON_AddNumberToObject(out->response, "address", address);
         cJSON_AddNumberToObject(out->response, "andMask", (double) rq->and_mask);
         cJSON_AddNumberToObject(out->response, "orMask", (double) rq->or_mask);
+        break;
+    case OP_REPORT_SERVER_ID:
+        for (int i = 0; i < rc && i < (int) sizeof(id); i++)
+            snprintf(hex + 2 * i, 3, "%02x", id[i]);
+        hex[2 * (rc < (int) sizeof(id) ? rc : (int) sizeof(id))] = '\0';
+        cJSON_AddStringToObject(out->response, "data", hex);
         break;
     case OP_RAW:
         break;

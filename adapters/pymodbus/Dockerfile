@@ -25,7 +25,7 @@ FROM ${BASE_REGISTRY}/python:3.14.8-slim-trixie@${PYTHON_DIGEST} AS build
 # another release cannot be known here, so it is installed without hash
 # checking, and the hash of what was downloaded is what print-capabilities
 # reports as the revision.
-ARG UPSTREAM_VERSION=3.15.0
+ARG UPSTREAM_VERSION=3.16.1
 ARG ADAPTER_VERSION=dev
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \

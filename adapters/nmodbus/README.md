@@ -65,7 +65,8 @@ NModbus's:
 | Quantity above the maximum, exception 3 | Up to 2040 bits and 127 registers are answered normally (`Modbus.MaximumDiscreteRequestResponseSize`, `MaximumRegisterRequestResponseSize`), although the protocol allows 2000 and 125 (1968 and 123 for the writes, 121 for the write of FC23). Above those limits the request class throws `ArgumentOutOfRangeException` and the connection is closed | `CheckedService` applies the protocol maximum, and turns the `ArgumentOutOfRangeException` of the request class into exception 3 |
 | FC05 value, FC15/FC16 byte count | A value other than 0xFF00 is taken as "off". A byte count that does not match the quantity is not noticed | `CheckedService` answers exception 3, as the specification's state diagrams do |
 | FC23 | Writes, then reads (as the fixture rules ask). A request whose read range is outside the block is answered with exception 2 after the write has been made | `CheckedService` checks both ranges first, so nothing is written |
-| FC08, FC21 | Built in (echo; write file record) | Left out: the fixture rules answer every other function with exception 1 |
+| FC08 | `DiagnosticsService` answers every sub-function with the echo of the request. Its message class (internal) keeps exactly one data word: a longer request is answered with the first word only, a shorter one closes the connection (`FormatException`) | `DiagnosticsService` is registered behind `CheckedService`, which looks at the frame before the message class does: a sub-function other than 0 is exception 1 (rule 8), sub-function 0 with other than two data bytes (or a frame too short for a sub-function) is exception 3. Return Query Data with one data word is NModbus's echo (`serverDiagnostics: true`) |
+| FC21 | `WriteFileRecordService` is built in, but its `HandleSlaveRequest` throws `NotImplementedException` (a stock slave answers exception 4) | Left out: answered with exception 1 |
 
 Not provided, because NModbus has nothing to build them on:
 
@@ -78,6 +79,14 @@ Not provided, because NModbus has nothing to build them on:
   its `HandleSlaveRequest` throws `NotImplementedException` (which a stock
   slave answers with exception 4). The service is not registered and the
   request is answered with exception 1.
+- **FC17 Report Server ID** (`serverReportServerId: false`). No message
+  class or service. A request is only a function code, which NModbus cannot
+  parse (see below): the connection is closed before any service is reached.
+- **FC20 Read File Record, FC21 Write File Record** (`serverFileRecord:
+  false`). FC20 has no message class or service; FC21's service has no
+  server side (above). Both are answered with exception 1.
+- **FC24 Read FIFO Queue** (`serverFifoQueue: false`). No message class or
+  service; answered with exception 1.
 - **Connection events** (`connectionEvents: false`). Connections are accepted
   and closed inside `ModbusTcpSlaveNetwork`; the closed event is internal and
   there is none for a new connection. The only trace is the text of log
@@ -85,7 +94,9 @@ Not provided, because NModbus has nothing to build them on:
 
 Request events come from `ReportingSlave`, an `IModbusSlave` that wraps each
 slave: it sees the parsed request and the response NModbus is about to send,
-exception responses included.
+exception responses included. FC08 events carry only `unitId`, `function`
+and `exception`, as the contract asks; the parsed FC08 request is of an
+internal NModbus class and is not looked into.
 
 Limits that remain, all inside NModbus's connection handling (internal, no
 extension point):
@@ -113,7 +124,8 @@ extension point):
 `ModbusFactory.CreateMaster(TcpClient)` and the synchronous `IModbusMaster`
 methods: `ReadCoils`, `ReadInputs`, `ReadHoldingRegisters`,
 `ReadInputRegisters`, `WriteSingleCoil`, `WriteSingleRegister`,
-`WriteMultipleCoils`, `WriteMultipleRegisters`, `ReadWriteMultipleRegisters`.
+`WriteMultipleCoils`, `WriteMultipleRegisters`, `ReadWriteMultipleRegisters`,
+`WriteFileRecord`.
 
 - **Timeouts.** The TCP connect is bounded by `--connect-timeout-ms`.
   `Transport.ReadTimeout`/`WriteTimeout` are set to `--timeout-ms`; a
@@ -132,8 +144,26 @@ methods: `ReadCoils`, `ReadInputs`, `ReadHoldingRegisters`,
 - **`raw`.** `ExecuteCustomMessage` with a request and a response class of
   the adapter that carry the bytes as they are. NModbus still checks the
   function code, unit identifier and transaction identifier of the response.
-- **`mask-write-register`** is not available (`clientMaskWrite: false`):
-  NModbus has no Mask Write Register. The operation is a usage error (exit 2).
+- **`write-file-record`.** `IModbusMaster.WriteFileRecord(unit, file,
+  startingAddress, data)`: one sub-request, reference type 6, at most 244
+  data bytes (122 registers). NModbus compares only the file number and the
+  record number of the echo with the request; the reference type, the record
+  length and the data of the echo are not checked (an echo with reference
+  type 7, or with one register of other data, is accepted). An echo shorter
+  than its own byte count is `invalid-response`. It
+  returns nothing, so the result reports the request's file, record and
+  number of registers.
+- **`raw`** receives the normal response of any function code
+  (`clientRawAnyResponse: true`): the TCP transport reads as many bytes as
+  the MBAP length says, whatever the function.
+- Not available, each a usage error (exit 2), nothing sent:
+  **`mask-write-register`** (`clientMaskWrite: false`: NModbus has no Mask
+  Write Register), **`diagnostics`** (`clientDiagnostics: false`:
+  `ReturnQueryData` exists only on the serial master, `IModbusSerialMaster`,
+  and the request class is internal), **`report-server-id`**,
+  **`read-file-record`** and **`read-fifo-queue`**
+  (`clientReportServerId`, `clientReadFileRecord`, `clientFifoQueue: false`:
+  no API, no message classes).
 - **`--repeat`** sends the request again on the same master and connection.
 
 Error codes: NModbus raises `SlaveException` for an exception response and

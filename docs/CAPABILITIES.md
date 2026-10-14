@@ -62,6 +62,16 @@ Every adapter declares every feature, `true` or `false`.
 | `clientRaw` | The `raw` operation: any function code and PDU, the response PDU handed back as it arrived |
 | `clientRepeat` | `--repeat`: several requests on one connection |
 | `clientUnitIdCheck` | The client rejects a response whose unit identifier is not the one of the request (`invalid-response`) |
+| `serverDiagnostics` | The server implements FC08 Return Query Data (sub-function 0) |
+| `serverReportServerId` | The server implements FC17 from the fixture's `reportServerId` |
+| `serverFileRecord` | The server implements FC20 and FC21 on the fixture's `fileRecords` |
+| `serverFifoQueue` | The server implements FC24 from the fixture's `fifoQueues` |
+| `clientDiagnostics` | The `diagnostics` operation |
+| `clientReportServerId` | The `report-server-id` operation |
+| `clientReadFileRecord` | The `read-file-record` operation |
+| `clientWriteFileRecord` | The `write-file-record` operation |
+| `clientFifoQueue` | The `read-fifo-queue` operation |
+| `clientRawAnyResponse` | `raw` receives the normal response of any function code, framed by the MBAP length. Without it, `raw` receives exception responses and the normal responses of the functions the library knows |
 
 The eight basic functions (FC01 to FC06, FC15, FC16), in both roles, and
 exception 2 for an address outside the fixture are not features: every
