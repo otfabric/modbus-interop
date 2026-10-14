@@ -6,13 +6,14 @@ Test Modbus libraries against established implementations: libmodbus, PyModbus, 
 | Adapter | Implementation | Version | Language | Server | Client | Image |
 |---------|----------------|---------|----------|:------:|:------:|-------|
 | `libmodbus` | [libmodbus](https://github.com/stephane/libmodbus) | v3.2.0 | C | yes | yes | `ghcr.io/otfabric/modbus-interop-libmodbus` |
-| `pymodbus` | [PyModbus](https://github.com/pymodbus-dev/pymodbus) | 3.15.0 | Python | yes | yes | `ghcr.io/otfabric/modbus-interop-pymodbus` |
+| `pymodbus` | [PyModbus](https://github.com/pymodbus-dev/pymodbus) | 3.16.1 | Python | yes | yes | `ghcr.io/otfabric/modbus-interop-pymodbus` |
 | `digitalpetri` | [digitalpetri/modbus](https://github.com/digitalpetri/modbus) | 2.1.6 | Java | yes | yes | `ghcr.io/otfabric/modbus-interop-digitalpetri` |
 | `nmodbus` | [NModbus](https://github.com/NModbus/NModbus) | 3.0.83 | C# | yes | yes | `ghcr.io/otfabric/modbus-interop-nmodbus` |
 | `tokiomodbus` | [tokio-modbus](https://github.com/slowtec/tokio-modbus) | 0.17.0 | Rust | yes | yes | `ghcr.io/otfabric/modbus-interop-tokiomodbus` |
 
-The stacks do not all do the same: not every one has FC22, FC23 or Read
-Device Identification, and they differ in what they check. Each image says
+The stacks do not all do the same: not every one has FC22, FC23, Read
+Device Identification, Diagnostics, Report Server ID, file records or FIFO
+queues, and they differ in what they check. Each image says
 what it supports (`print-capabilities`); see
 [docs/CAPABILITIES.md](docs/CAPABILITIES.md) and
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the exact versions, the
@@ -81,7 +82,9 @@ server               a Modbus TCP device serving a fixture
 client <operation>   read-coils, read-discrete-inputs, read-holding-registers,
                      read-input-registers, write-single-coil, write-single-register,
                      write-multiple-coils, write-multiple-registers, mask-write-register,
-                     read-write-multiple-registers, read-device-identification, raw
+                     read-write-multiple-registers, read-device-identification,
+                     diagnostics, report-server-id, read-file-record,
+                     write-file-record, read-fifo-queue, raw
 print-capabilities   what this adapter supports, as JSON
 print-fixture        the fixture baked into the image
 ```

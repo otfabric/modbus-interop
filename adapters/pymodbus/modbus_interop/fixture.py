@@ -16,7 +16,12 @@ from pathlib import Path
 TABLES = ("coils", "discreteInputs", "holdingRegisters", "inputRegisters")
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PRINTABLE = re.compile(r"^[\x20-\x7e]*$")
-_ROOT_KEYS = {"schemaVersion", "name", "description", "unitId", "deviceIdentification", *TABLES}
+_ROOT_KEYS = {
+    "schemaVersion", "name", "description", "unitId", "deviceIdentification",
+    "reportServerId", "fileRecords", "fifoQueues", *TABLES,
+}
+MAX_FILE_RECORDS = 10000
+MAX_FIFO_VALUES = 31
 
 
 class FixtureError(Exception):
@@ -49,6 +54,9 @@ class Fixture:
     tables: dict = field(default_factory=dict)  # table name -> Block (absent: no such table)
     objects: dict = field(default_factory=dict)  # object id -> str, ascending
     has_identification: bool = False
+    server_id: tuple | None = None  # (serverId, runIndicator) of Report Server ID; None: not served
+    files: dict = field(default_factory=dict)  # file number -> list of registers
+    fifos: dict = field(default_factory=dict)  # FIFO pointer address -> list of registers, oldest first
 
     @property
     def conformity_level(self) -> int:
@@ -116,6 +124,58 @@ def _check_identification(ident) -> dict:
     return result
 
 
+def _registers(where: str, values, low: int, high: int) -> list:
+    if not isinstance(values, list) or not low <= len(values) <= high:
+        raise FixtureError(f"{where}: must be an array of {low}..{high} elements")
+    for i, value in enumerate(values):
+        if not _is_int(value) or not 0 <= value <= 65535:
+            raise FixtureError(f"{where}[{i}] is not an integer 0..65535")
+    return list(values)
+
+
+def _check_server_id(value) -> tuple:
+    if not isinstance(value, dict) or set(value) != {"serverId", "runIndicator"}:
+        raise FixtureError("reportServerId: must be an object with exactly 'serverId' and 'runIndicator'")
+    server_id, run = value["serverId"], value["runIndicator"]
+    if not _is_int(server_id) or not 0 <= server_id <= 255:
+        raise FixtureError("reportServerId: serverId must be an integer 0..255")
+    if not isinstance(run, bool):
+        raise FixtureError("reportServerId: runIndicator must be a boolean")
+    return server_id, run
+
+
+def _check_files(value) -> dict:
+    if not isinstance(value, list) or not value:
+        raise FixtureError("fileRecords: must be an array of at least 1 element")
+    result: dict = {}
+    for i, item in enumerate(value):
+        if not isinstance(item, dict) or set(item) != {"file", "records"}:
+            raise FixtureError(f"fileRecords[{i}]: must have exactly 'file' and 'records'")
+        number = item["file"]
+        if not _is_int(number) or not 1 <= number <= 65535:
+            raise FixtureError(f"fileRecords[{i}].file must be an integer 1..65535")
+        if number in result:
+            raise FixtureError("fileRecords: file numbers must be unique")
+        result[number] = _registers(f"fileRecords[{i}].records", item["records"], 1, MAX_FILE_RECORDS)
+    return result
+
+
+def _check_fifos(value) -> dict:
+    if not isinstance(value, list) or not value:
+        raise FixtureError("fifoQueues: must be an array of at least 1 element")
+    result: dict = {}
+    for i, item in enumerate(value):
+        if not isinstance(item, dict) or set(item) != {"address", "values"}:
+            raise FixtureError(f"fifoQueues[{i}]: must have exactly 'address' and 'values'")
+        address = item["address"]
+        if not _is_int(address) or not 0 <= address <= 65535:
+            raise FixtureError(f"fifoQueues[{i}].address must be an integer 0..65535")
+        if address in result:
+            raise FixtureError("fifoQueues: addresses must be unique")
+        result[address] = _registers(f"fifoQueues[{i}].values", item["values"], 0, MAX_FIFO_VALUES)
+    return result
+
+
 def load(path: str) -> Fixture:
     """Load and validate a fixture; raises FixtureError."""
     file = Path(path)
@@ -149,4 +209,10 @@ def load(path: str) -> Fixture:
     if "deviceIdentification" in doc:
         fixture.objects = _check_identification(doc["deviceIdentification"])
         fixture.has_identification = True
+    if "reportServerId" in doc:
+        fixture.server_id = _check_server_id(doc["reportServerId"])
+    if "fileRecords" in doc:
+        fixture.files = _check_files(doc["fileRecords"])
+    if "fifoQueues" in doc:
+        fixture.fifos = _check_fifos(doc["fifoQueues"])
     return fixture

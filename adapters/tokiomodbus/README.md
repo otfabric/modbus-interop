@@ -62,7 +62,10 @@ Everything a device decides is in the service: unit identifier, quantity
 limits (exception 3, checked before the address as the specification's state
 diagrams do), address ranges (exception 2), FC22, FC23 (both ranges are
 checked, then the write, then the read), FC43/14 and exception 1 for the
-rest. The library supplies the Read Device Identification PDU types; cutting
+rest, FC17 included: the library's FC17 response is malformed on the wire
+(finding 7), so the service refuses the request instead of sending it. FC08, FC20, FC21 and FC24 reach the service only as `Request::Custom`
+bytes: the library has no types for them, so they get exception 1 like any
+other function it does not know. The library supplies the Read Device Identification PDU types; cutting
 the object list into responses that fit a PDU ("more follows") and individual
 access (read code 4) are the service's work, so the conformity level is the
 fixture's level plus 0x80.
@@ -74,18 +77,31 @@ connects itself (name resolution and connect are bounded by
 `--connect-timeout-ms`), with the unit identifier as `Slave`.
 
 - Reads, FC23 and FC43/14 use the `Reader` methods.
+- `report-server-id` is `Client::call(Request::ReportServerId)`. The library
+  checks the byte count (at least 2) and the run indicator (0x00 or 0xFF);
+  `data` is the server ID, the run indicator and the additional data as the
+  library decoded them.
+- `diagnostics`, `read-file-record`, `write-file-record` and
+  `read-fifo-queue` are usage errors (exit 2, nothing sent): tokio-modbus has
+  no request or response types for FC08, FC20, FC21 and FC24, and encoding
+  and decoding them here would be protocol code the library lacks.
 - Writes use `Client::call` with the `Request` variants and compare the
   echoed address, value, quantity and masks themselves. The `Writer` methods
   return `()` and check the echo only with `debug_assert!`, which a release
   build does not contain.
-- `raw` is `Request::Custom`.
+- `raw` is `Request::Custom`. A response of a function code the library does
+  not decode comes back as `Response::Custom` with everything the MBAP length
+  frames (`clientRawAnyResponse`).
 - The library has no timeouts: every call is wrapped in
   `tokio::time::timeout` with `--timeout-ms`.
 - The library's nested result maps to the contract like this: the inner
   `ExceptionCode` is `exception`; `ProtocolError::HeaderMismatch` (transaction
   or unit identifier) and `FunctionCodeMismatch` are `invalid-response`, as is
   a transport error of kind `InvalidData` (the codec could not decode the
-  response); a closed connection is `connection-lost`.
+  response); a closed connection is `connection-lost`. A transport error of
+  kind `UnexpectedEof` while the connection is still open is
+  `invalid-response` too: the frame arrived whole, but its byte count claims
+  more than it holds (an FC17 response `11 05 2A FF`, for example).
 
 The stream is wrapped in a pass-through that records what was received. It
 exists for two things the library does not provide:
@@ -102,8 +118,22 @@ exists for two things the library does not provide:
 
 ## What it cannot do
 
-Every feature is declared `true`. The limits below are inside features that
-pass the self-tests; they come from the codec, which the service cannot
+Declared `false`, because tokio-modbus 0.17.0 has no types for the function
+(it hands the bytes over as `Custom`): `serverDiagnostics`,
+`serverFileRecord`, `serverFifoQueue`, `clientDiagnostics`,
+`clientReadFileRecord`, `clientWriteFileRecord`, `clientFifoQueue`. FC08,
+FC20, FC21 and FC24 remain reachable through `raw`.
+
+Declared `false` because the library gets it wrong: `serverReportServerId`.
+The codec decodes FC17 requests and has a `Response::ReportServerId`, but its
+encoder frames that response one byte short (finding 7), and a frame no client
+can read helps no consumer. The service therefore answers FC17 with exception
+1 and 17 is not in `serverFunctions`. The adapter does not re-encode the
+response itself (REQUIREMENTS.md R2.4). The fixture's `reportServerId` is
+validated and otherwise unused.
+
+Every other feature is declared `true`. The limits below are inside features
+that pass the self-tests; they come from the codec, which the service cannot
 influence, and the adapter does not paper over them.
 
 - **Requests the codec rejects are not answered; the connection is closed.**
@@ -119,6 +149,8 @@ influence, and the adapter does not paper over them.
   - FC43 with a MEI type other than 14, or a read code outside 1..4
     (specification: exception 1 and exception 3)
   - a function code of 128 or above
+  - FC17 with any data byte after the function code (the decoder reports
+    "undecoded request data")
 - **FC15 with a quantity larger than its bytes hold makes the library
   panic** while decoding (see findings). The panic unwinds the task of that
   connection only, the connection closes and the server carries on. The
@@ -151,7 +183,18 @@ influence, and the adapter does not paper over them.
 6. The requests listed under "What it cannot do" end the connection where
    the specification (V1.1b3, section 6 state diagrams) asks for an exception
    response.
-7. The client drops whatever is in its read buffer before each request and
+7. **The FC17 response frame is one byte short.** `response_pdu_size` counts
+   `ReportServerId(_, _, data)` as `3 + data.len()`, but the PDU is function
+   code, byte count, server ID and run indicator: `4 + data.len()`. The MBAP
+   length is computed from it, so the server sends `00 01 00 00 00 04 01 11 02
+   2A FF` for server ID 42, running (captured from the server with a plain
+   socket client): the length says 4 (unit identifier and three PDU bytes)
+   and the frame has five after the length field. A tokio-modbus client reads
+   `11 02 2A` as the response and fails ("failed to fill whole buffer"); the
+   stray `FF` is left in the stream before the next response. The client side
+   (`decode_response_pdu_bytes`) is correct. Because of this the adapter's
+   server refuses FC17 with exception 1.
+8. The client drops whatever is in its read buffer before each request and
    requires the transaction and unit identifier of the response to equal the
    request's, so a late response to an earlier request is rejected rather
    than mistaken for the current one.
@@ -165,3 +208,9 @@ The same peer was used for the other error codes: wrong transaction
 identifier, wrong function, echo mismatch, short read, connection closed
 before and in the middle of a response, differing responses under `--repeat`
 and a device identification split over two responses.
+
+`report-server-id` and `clientRawAnyResponse` were verified against a scripted
+peer: FC17 `11 02 2A FF` gives `data` `2aff`, `11 04 2A FF 01 02` gives
+`2aff0102`, a run indicator of 0x01 and a byte count of 5 in a frame that holds
+2 are `invalid-response`; `raw --function 24 --data 04de` answered with `18 00
+06 00 02 01 B8 12 84` gives `data` `0006000201b81284`.

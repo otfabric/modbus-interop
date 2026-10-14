@@ -12,7 +12,8 @@
     "operation": {
       "enum": ["read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
                "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
-               "mask-write-register", "read-write-multiple-registers", "read-device-identification", "raw"]
+               "mask-write-register", "read-write-multiple-registers", "read-device-identification", "diagnostics",
+               "report-server-id", "read-file-record", "write-file-record", "read-fifo-queue", "raw"]
     },
     "ok": { "type": "boolean" },
     "error": {
@@ -56,6 +57,9 @@
                 "properties": { "id": { "type": "integer", "minimum": 0, "maximum": 255 }, "value": { "type": "string" } }
               }
             },
+            "subFunction": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "file": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "record": { "type": "integer", "minimum": 0, "maximum": 9999 },
             "data": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
           }
         }

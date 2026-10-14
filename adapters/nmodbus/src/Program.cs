@@ -157,6 +157,16 @@ namespace ModbusInterop.NModbusAdapter
                 w.WriteBoolean("clientRaw", true);
                 w.WriteBoolean("clientRepeat", true);
                 w.WriteBoolean("clientUnitIdCheck", true);
+                w.WriteBoolean("serverDiagnostics", true);
+                w.WriteBoolean("serverReportServerId", false);
+                w.WriteBoolean("serverFileRecord", false);
+                w.WriteBoolean("serverFifoQueue", false);
+                w.WriteBoolean("clientDiagnostics", false);
+                w.WriteBoolean("clientReportServerId", false);
+                w.WriteBoolean("clientReadFileRecord", false);
+                w.WriteBoolean("clientWriteFileRecord", true);
+                w.WriteBoolean("clientFifoQueue", false);
+                w.WriteBoolean("clientRawAnyResponse", true);
                 w.WriteEndObject();
                 w.WriteStartArray("serverFunctions");
                 foreach (int function in FixtureDevice.Functions)

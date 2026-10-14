@@ -5,7 +5,8 @@
 //! The requests go through tokio-modbus's TCP client context
 //! (`tokio_modbus::client::Context`): the `Reader` methods for the reads,
 //! `Client::call` for the writes (it hands out the echo, which the `Writer`
-//! methods check only in debug builds) and `Request::Custom` for `raw`.
+//! methods check only in debug builds), `Request::ReportServerId` for FC17
+//! and `Request::Custom` for `raw`.
 //! The library knows no timeouts; every wait is wrapped in one here.
 
 use std::borrow::Cow;
@@ -111,6 +112,10 @@ impl Session {
                 let code = match e.kind() {
                     // The codec could not decode what arrived.
                     InvalidData => "invalid-response",
+                    // A frame arrived whole (the MBAP length says how long it
+                    // is), but the PDU decoder ran out of bytes inside it: a
+                    // byte count that claims more than the frame holds.
+                    UnexpectedEof if !self.closed_by_peer() => "invalid-response",
                     UnexpectedEof | ConnectionReset | ConnectionAborted | BrokenPipe | NotConnected => {
                         "connection-lost"
                     }
@@ -119,6 +124,8 @@ impl Session {
                 };
                 let message = if code == "connection-lost" {
                     format!("the connection closed before the response ({e})")
+                } else if e.kind() == UnexpectedEof {
+                    format!("the response is shorter than its contents say ({e})")
                 } else {
                     e.to_string()
                 };
@@ -325,6 +332,17 @@ async fn once(session: &mut Session, op: &Op) -> Result<String, Failure> {
                 .raw("objects", &format!("[{}]", list.join(",")))
                 .end())
         }
+        Op::ReportServerId => match exchange!(session.call(Request::ReportServerId))? {
+            // The library has checked the byte count (at least 2) and the run
+            // indicator (0x00 or 0xFF).
+            Response::ReportServerId(server_id, running, additional) => {
+                let mut data = vec![server_id, if running { 0xFF } else { 0x00 }];
+                data.extend_from_slice(&additional);
+                session.responses += 1;
+                Ok(response.str("data", &json::hex(&data)).end())
+            }
+            other => Err(invalid(format!("not a Report Server ID response: {other:?}"))),
+        },
         Op::Raw { function, data } => {
             let function = *function;
             let request = Request::Custom(function, Cow::Borrowed(data));

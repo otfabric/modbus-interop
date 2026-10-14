@@ -208,6 +208,12 @@ namespace ModbusInterop.NModbusAdapter
 
         public IModbusMessage CreateRequest(byte[] frame)
         {
+            byte rejection = CheckFrame(frame);
+            if (rejection != 0)
+            {
+                return new OpaqueRequest(frame, rejection);
+            }
+
             try
             {
                 return _inner.CreateRequest(frame);
@@ -244,6 +250,41 @@ namespace ModbusInterop.NModbusAdapter
         public int GetRtuResponseBytesToRead(byte[] frameStart)
         {
             return _inner.GetRtuResponseBytesToRead(frameStart);
+        }
+
+        /// <summary>
+        /// Checks made on the frame (unit identifier, function code, data)
+        /// before the NModbus message class sees it, for requests whose
+        /// message class is internal to NModbus. Returns the exception code to
+        /// answer with, 0 to hand the frame to the service.
+        /// </summary>
+        private static byte CheckFrame(byte[] frame)
+        {
+            if (frame.Length >= 2 && frame[1] == ModbusFunctionCodes.Diagnostics)
+            {
+                // DiagnosticsService answers every sub-function with the echo
+                // of the request, and its message class keeps exactly one data
+                // word: a longer request is answered with the first word only,
+                // a shorter one ends the connection (FormatException). Only
+                // Return Query Data (sub-function 0) with one data word is
+                // handed to it.
+                if (frame.Length < 4)
+                {
+                    return SlaveExceptionCodes.IllegalDataValue;
+                }
+
+                if (frame[2] != 0 || frame[3] != 0)
+                {
+                    return SlaveExceptionCodes.IllegalFunction;
+                }
+
+                if (frame.Length != 6)
+                {
+                    return SlaveExceptionCodes.IllegalDataValue;
+                }
+            }
+
+            return 0;
         }
 
         private static void Check(IModbusMessage request, FixtureDataStore store)
@@ -361,7 +402,8 @@ namespace ModbusInterop.NModbusAdapter
                     writer.WriteNumber("writeAddress", r.WriteRequest.StartAddress);
                     Registers(writer, "writeRegisters", r.WriteRequest.Data);
                     break;
-                case OpaqueRequest r when r.Rejection != 0 && r.MessageFrame.Length >= 6:
+                case OpaqueRequest r when r.Rejection != 0 && r.FunctionCode != ModbusFunctionCodes.Diagnostics
+                                          && r.MessageFrame.Length >= 6:
                     // A request of a function the device has, kept as bytes
                     // because its quantity is out of range.
                     Range(writer, (r.MessageFrame[2] << 8) | r.MessageFrame[3], (r.MessageFrame[4] << 8) | r.MessageFrame[5]);
@@ -412,15 +454,16 @@ namespace ModbusInterop.NModbusAdapter
     internal static class FixtureDevice
     {
         /// <summary>Function codes answered with something other than exception 1.</summary>
-        public static readonly int[] Functions = { 1, 2, 3, 4, 5, 6, 15, 16, 23 };
+        public static readonly int[] Functions = { 1, 2, 3, 4, 5, 6, 8, 15, 16, 23 };
 
         /// <summary>
         /// The factory of the server: NModbus's services for the functions the
         /// device has, each behind its checks, and a refusing service for every
         /// other function code. Without one NModbus cannot create the request
         /// and ends the connection instead of answering exception 1. Its
-        /// built-in Diagnostics (08), Write File Record (21) and Read Device
-        /// Identification (43, which has no server side) are left out.
+        /// built-in Write File Record (21) and Read Device Identification (43)
+        /// are left out: both have no server side (HandleSlaveRequest throws
+        /// NotImplementedException).
         /// </summary>
         public static ModbusFactory CreateFactory(IModbusLogger logger)
         {
@@ -432,6 +475,7 @@ namespace ModbusInterop.NModbusAdapter
                 new CheckedService(new ReadInputRegistersService()),
                 new CheckedService(new WriteSingleCoilService()),
                 new CheckedService(new WriteSingleRegisterService()),
+                new CheckedService(new DiagnosticsService()),
                 new CheckedService(new WriteMultipleCoilsService()),
                 new CheckedService(new WriteMultipleRegistersService()),
                 new CheckedService(new ReadWriteMultipleRegistersService()),

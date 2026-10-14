@@ -22,7 +22,8 @@ _FALSE = {"false", "0", "off"}
 CLIENT_OPERATIONS = [
     "read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
     "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
-    "mask-write-register", "read-write-multiple-registers", "read-device-identification", "raw",
+    "mask-write-register", "read-write-multiple-registers", "read-device-identification", "diagnostics",
+    "report-server-id", "read-file-record", "write-file-record", "read-fifo-queue", "raw",
 ]
 
 USAGE = """usage:
@@ -92,6 +93,14 @@ def register(flag: str, text: str) -> int:
     return number(flag, text, 0, 65535)
 
 
+def hex_data(flag: str, text: str, limit: int) -> bytes:
+    if len(text) % 2 or not re.fullmatch(r"[0-9a-fA-F]*", text):
+        raise UsageError(f"{flag}: not a string of hexadecimal byte pairs")
+    if len(text) // 2 > limit:
+        raise UsageError(f"{flag}: at most {limit} bytes")
+    return bytes.fromhex(text)
+
+
 def build_info() -> dict:
     try:
         with open(BUILD_INFO, encoding="utf-8") as handle:
@@ -139,8 +148,20 @@ def capabilities() -> dict:
             "clientRaw": True,
             "clientRepeat": True,
             "clientUnitIdCheck": True,
+            "serverDiagnostics": True,
+            "serverReportServerId": True,
+            "serverFileRecord": True,
+            "serverFifoQueue": True,
+            "clientDiagnostics": True,
+            "clientReportServerId": True,
+            "clientReadFileRecord": True,
+            "clientWriteFileRecord": True,
+            "clientFifoQueue": True,
+            # The socket framer frames by the MBAP length and the raw PDU
+            # class is registered for the function code of the request.
+            "clientRawAnyResponse": True,
         },
-        "serverFunctions": [1, 2, 3, 4, 5, 6, 15, 16, 22, 23, 43],
+        "serverFunctions": [1, 2, 3, 4, 5, 6, 8, 15, 16, 17, 20, 21, 22, 23, 24, 43],
         "clientOperations": CLIENT_OPERATIONS,
     }
 
@@ -178,6 +199,11 @@ def client_params(operation: str, args: list[str]) -> dict:
         "mask-write-register": {"address", "and-mask", "or-mask"},
         "read-write-multiple-registers": {"read-address", "read-quantity", "write-address", "values"},
         "read-device-identification": {"category"},
+        "diagnostics": {"sub-function", "data"},
+        "report-server-id": set(),
+        "read-file-record": {"file", "record", "length"},
+        "write-file-record": {"file", "record", "values"},
+        "read-fifo-queue": {"address"},
         "raw": {"function", "data"},
     }[operation]
     given = flags(args, common | specific)
@@ -228,14 +254,23 @@ def client_params(operation: str, args: list[str]) -> dict:
         if category not in ("basic", "regular", "extended"):
             raise UsageError(f"--category: {category!r} is not basic, regular or extended")
         params["category"] = category
+    elif operation == "diagnostics":
+        params["sub_function"] = number("--sub-function", required(given, "sub-function"), 0, 65535)
+        # A PDU has at most 252 bytes after the function code, two of them
+        # the sub-function.
+        params["data"] = hex_data("--data", required(given, "data"), 250)
+    elif operation in ("read-file-record", "write-file-record"):
+        params["file"] = number("--file", required(given, "file"), 1, 65535)
+        params["record"] = number("--record", required(given, "record"), 0, 9999)
+        if operation == "read-file-record":
+            params["length"] = number("--length", required(given, "length"), 1, 121)
+        else:
+            params["values"] = value_list("--values", required(given, "values"), register, 1, 122)
+    elif operation == "read-fifo-queue":
+        params["address"] = address()
     elif operation == "raw":
         params["function"] = number("--function", required(given, "function"), 1, 127)
-        data = required(given, "data")
-        if len(data) % 2 or not re.fullmatch(r"[0-9a-fA-F]*", data):
-            raise UsageError("--data: not a string of hexadecimal byte pairs")
-        if len(data) // 2 > 252:
-            raise UsageError("--data: a PDU has at most 252 bytes after the function code")
-        params["data"] = bytes.fromhex(data)
+        params["data"] = hex_data("--data", required(given, "data"), 252)
     return params
 
 

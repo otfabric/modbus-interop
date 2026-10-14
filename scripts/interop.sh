@@ -11,6 +11,8 @@
 #   - every write function changes what a later read on another connection
 #     returns, at the largest quantity the protocol allows,
 #   - FC22 and FC23 compute what the specification says,
+#   - FC08, FC17, FC20, FC21 and FC24 return the fixture's data, and FC21
+#     changes what a later FC20 reads,
 #   - the server reports the requests it answered,
 #   - many requests on one connection and concurrent connections work.
 #
@@ -286,6 +288,64 @@ for server in "${ADAPTERS[@]}"; do
             done
         else skip "${pair}: request events"; fi
         stop_server "${name}"
+    done
+done
+
+# ---- values: diagnostics, server ID, file records, FIFO queues ----
+# What the cases above only count, compared with the fixture.
+server_id_hex=$(printf '%02x%s' "$(jq -r '.reportServerId.serverId' "${FIXTURE}")" "$(jq -r 'if .reportServerId.runIndicator then "ff" else "00" end' "${FIXTURE}")")
+for server in "${ADAPTERS[@]}"; do
+    has_role "${server}" server || continue
+    for client in "${ADAPTERS[@]}"; do
+        has_role "${client}" client || continue
+        pair="${client}->${server}"
+        name=$(shared_server "${server}")
+        if supported "${client}" "${server}" "server:serverDiagnostics,client:clientDiagnostics"; then
+            got=$(run_client "${client}" diagnostics --sub-function 0 --data c0de --host "${name}" | jq -c '.response')
+            if [[ "${got}" == '{"function":8,"subFunction":0,"data":"c0de"}' ]]; then ok "${pair}: FC08 echoes Return Query Data"
+            else fail "${pair}: FC08 Return Query Data returned ${got}"; fi
+        else skip "${pair}: FC08 value"; fi
+        if supported "${client}" "${server}" "server:serverReportServerId,client:clientReportServerId"; then
+            got=$(run_client "${client}" report-server-id --host "${name}" | jq -r '.response.data')
+            if [[ "${got}" == "${server_id_hex}" ]]; then ok "${pair}: FC17 returns the fixture's server ID and run indicator"
+            else fail "${pair}: FC17 returns ${got}, want ${server_id_hex}"; fi
+        else skip "${pair}: FC17 value"; fi
+        if supported "${client}" "${server}" "server:serverFileRecord,client:clientReadFileRecord"; then
+            while read -r file first count index; do
+                got=$(run_client "${client}" read-file-record --file "${file}" --record "${first}" --length "${count}" --host "${name}" | jq -c '.response.registers')
+                want=$(jq -c --argjson f "${index}" --argjson i "${first}" --argjson n "${count}" '.fileRecords[$f].records[$i:$i+$n]' "${FIXTURE}")
+                if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC20 ${count} records of file ${file} from ${first} match the fixture"
+                else fail "${pair}: FC20 file ${file} from ${first}: ${got:0:160}, want ${want:0:160}"; fi
+            done <<FILES
+1 0 120 0
+1 120 80 0
+2 0 4 1
+FILES
+        else skip "${pair}: FC20 values"; fi
+        if supported "${client}" "${server}" "server:serverFifoQueue,client:clientFifoQueue"; then
+            for index in 0 1 2; do
+                address=$(jq -r --argjson q "${index}" '.fifoQueues[$q].address' "${FIXTURE}")
+                got=$(run_client "${client}" read-fifo-queue --address "${address}" --host "${name}" | jq -c '.response.registers')
+                want=$(jq -c --argjson q "${index}" '.fifoQueues[$q].values' "${FIXTURE}")
+                if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC24 queue at ${address} matches the fixture"
+                else fail "${pair}: FC24 queue at ${address}: ${got:0:160}, want ${want:0:160}"; fi
+            done
+        else skip "${pair}: FC24 values"; fi
+        if supported "${client}" "${server}" "server:serverFileRecord,client:clientWriteFileRecord,client:clientReadFileRecord"; then
+            name=$(start_server "${server}"); wait_ready "${name}" || exit 1
+            run_client "${client}" write-file-record --file 1 --record 10 --values 7,8,9 --host "${name}" >/dev/null
+            got=$(run_client "${client}" read-file-record --file 1 --record 8 --length 6 --host "${name}" | jq -c '.response.registers')
+            want=$(jq -c '.fileRecords[0].records[8:14] | .[2] = 7 | .[3] = 8 | .[4] = 9' "${FIXTURE}")
+            if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC21 is visible to a later FC20, neighbours untouched"
+            else fail "${pair}: FC20 after FC21 returns ${got}, want ${want}"; fi
+            if has "${server}" requestEvents; then
+                sleep 0.3
+                if docker logs "${name}" 2>/dev/null | jq -e -s 'map(select(.event == "request" and .function == 21 and .exception == null)) | length > 0' >/dev/null 2>&1
+                then ok "${pair}: server reports the FC21 request"
+                else fail "${pair}: no server event for the FC21 request"; fi
+            fi
+            stop_server "${name}"
+        else skip "${pair}: FC21 value"; fi
     done
 done
 

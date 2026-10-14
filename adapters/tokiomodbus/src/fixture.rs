@@ -32,9 +32,12 @@ pub struct Fixture {
     pub input_registers: Option<Block<u16>>,
     /// Ascending by id; empty when the fixture has no device identification.
     pub identification: Vec<IdObject>,
+    // `reportServerId`, `fileRecords` and `fifoQueues` are validated but not
+    // kept: the server does not implement FC17 (the library's response is
+    // malformed), FC20, FC21 and FC24 (tokio-modbus has no types for them).
 }
 
-const ROOT_KEYS: [&str; 9] = [
+const ROOT_KEYS: [&str; 12] = [
     "schemaVersion",
     "name",
     "description",
@@ -44,6 +47,9 @@ const ROOT_KEYS: [&str; 9] = [
     "holdingRegisters",
     "inputRegisters",
     "deviceIdentification",
+    "reportServerId",
+    "fileRecords",
+    "fifoQueues",
 ];
 
 /// An integer in `min..=max`. Like JSON Schema, a number with a zero
@@ -170,6 +176,72 @@ fn identification(root: &Map<String, Value>) -> Result<Vec<IdObject>, String> {
     Ok(objects)
 }
 
+fn report_server_id(root: &Map<String, Value>) -> Result<(), String> {
+    let Some(value) = root.get("reportServerId") else {
+        return Ok(());
+    };
+    let what = "reportServerId";
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{what}: must be an object"))?;
+    only_keys(object, &["serverId", "runIndicator"], what)?;
+    object
+        .get("serverId")
+        .and_then(|v| integer(v, 0, 255))
+        .ok_or_else(|| format!("{what}: serverId must be an integer 0..255"))?;
+    object
+        .get("runIndicator")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| format!("{what}: runIndicator must be a boolean"))?;
+    Ok(())
+}
+
+/// `fileRecords` and `fifoQueues`: a non-empty array of objects with a
+/// unique key (`key`, an integer in `key_range`) and a list of registers
+/// (`list`, `list_range` items).
+fn keyed_lists(
+    root: &Map<String, Value>,
+    what: &str,
+    key: &str,
+    key_range: (u64, u64),
+    list: &str,
+    list_range: (usize, usize),
+) -> Result<(), String> {
+    let Some(value) = root.get(what) else {
+        return Ok(());
+    };
+    let entries = value.as_array().ok_or_else(|| format!("{what}: must be an array"))?;
+    if entries.is_empty() {
+        return Err(format!("{what}: must have at least 1 item"));
+    }
+    let mut keys = Vec::with_capacity(entries.len());
+    for (i, entry) in entries.iter().enumerate() {
+        let entry = entry
+            .as_object()
+            .ok_or_else(|| format!("{what}[{i}]: must be an object"))?;
+        only_keys(entry, &[key, list], what)?;
+        let k = entry
+            .get(key)
+            .and_then(|v| integer(v, key_range.0, key_range.1))
+            .ok_or_else(|| format!("{what}[{i}].{key} must be an integer {}..{}", key_range.0, key_range.1))?;
+        if keys.contains(&k) {
+            return Err(format!("{what}: {key} {k} appears more than once"));
+        }
+        keys.push(k);
+        let values = entry
+            .get(list)
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{what}[{i}].{list} must be an array"))?;
+        if values.len() < list_range.0 || values.len() > list_range.1 {
+            return Err(format!("{what}[{i}].{list} must have {}..{} items", list_range.0, list_range.1));
+        }
+        if let Some(j) = values.iter().position(|v| integer(v, 0, 65535).is_none()) {
+            return Err(format!("{what}[{i}].{list}[{j}] must be an integer 0..65535"));
+        }
+    }
+    Ok(())
+}
+
 /// Parses and validates a fixture document. `directory` is the name of the
 /// directory the file lies in: the fixture's name must equal it.
 pub fn parse(text: &str, directory: Option<&str>) -> Result<Fixture, String> {
@@ -206,6 +278,9 @@ pub fn parse(text: &str, directory: Option<&str>) -> Result<Fixture, String> {
         input_registers: block(root, "inputRegisters", |v| integer(v, 0, 65535).map(|n| n as u16))?,
         identification: identification(root)?,
     };
+    report_server_id(root)?;
+    keyed_lists(root, "fileRecords", "file", (1, 65535), "records", (1, 10000))?;
+    keyed_lists(root, "fifoQueues", "address", (0, 65535), "values", (0, 31))?;
     if let Some(directory) = directory {
         if directory != fixture.name {
             return Err(format!(

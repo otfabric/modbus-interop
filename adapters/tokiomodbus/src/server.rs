@@ -152,8 +152,13 @@ impl Device {
                 Ok(Response::ReadWriteMultipleRegisters(registers[read].to_vec()))
             }
             Request::ReadDeviceIdentification(read_code, object_id) => self.identify(*read_code, *object_id),
-            // FC17 is decoded by the library but is not part of the device;
-            // everything else arrives as Custom.
+            // FC17 is refused: the library frames its Report Server ID
+            // response with an MBAP length one byte short (README, finding
+            // 7), which no client can read, and re-encoding it here would be
+            // protocol code the library lacks.
+            Request::ReportServerId => Err(ExceptionCode::IllegalFunction),
+            // Everything else, FC08, FC20, FC21 and FC24 included, arrives as
+            // Custom: the library has no types for it.
             _ => Err(ExceptionCode::IllegalFunction),
         }
     }

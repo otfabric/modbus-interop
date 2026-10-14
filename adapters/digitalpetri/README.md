@@ -73,7 +73,9 @@ close future.
 `--timeout-ms`; `connectPersistent=false` and `reconnectLazy=true` so that the
 transport makes one connection attempt and never reconnects behind the
 operation. Requests go out with `sendAsync(unitId, <RequestPdu>)`; `raw` uses
-`sendRawAsync(unitId, pdu)`, which hands back the response PDU as it arrived.
+`sendRawAsync(unitId, pdu)`, which frames the response by the MBAP length and
+hands back the PDU as it arrived, whatever its function code (`clientRawAnyResponse`;
+verified with normal FC08, FC20 and FC24 responses from a test peer).
 `--repeat` sends the requests one after the other on the same client.
 
 Error mapping:
@@ -93,6 +95,7 @@ Error mapping:
 | Feature | Why |
 |---|---|
 | `serverDeviceIdentification`, `clientDeviceIdentification` | The library has no FC43. `FunctionCode` names 0x2B, but there is no request or response class and neither serializer knows it. The server answers FC43 with exception 1; the client has no `read-device-identification` operation (exit 2). It could be hand-built on the raw hooks, but that would be the adapter's implementation, not the library's. |
+| `serverDiagnostics`, `serverReportServerId`, `serverFileRecord`, `serverFifoQueue`, `clientDiagnostics`, `clientReportServerId`, `clientReadFileRecord`, `clientWriteFileRecord`, `clientFifoQueue` | The library has no FC08, FC17, FC20, FC21 or FC24: no request or response class, in either role, only the raw hooks. The server answers them with exception 1 (11 for another unit identifier); the client refuses `diagnostics`, `report-server-id`, `read-file-record`, `write-file-record` and `read-fifo-queue` (exit 2, nothing sent). Writing the codecs in the adapter would be the adapter's implementation, not the library's. The fixture's `reportServerId`, `fileRecords` and `fifoQueues` are validated (exit 4 when invalid) but not served. |
 | `clientUnitIdCheck` | `ModbusTcpClient` matches a response to its request by transaction identifier only. A response with another unit identifier (or another protocol identifier) is accepted. Verified against a test peer that answers with the wrong unit identifier: the operation succeeds. |
 
 ## Findings about the library (2.1.6)

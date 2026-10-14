@@ -66,6 +66,24 @@ fn capabilities() -> String {
         .boolean("clientRaw", true)
         .boolean("clientRepeat", true)
         .boolean("clientUnitIdCheck", true)
+        // FC08, FC20, FC21 and FC24 exist in tokio-modbus only as raw
+        // `Custom` bytes: serving or decoding them would be protocol code
+        // written here. FC17 has request and response types in both roles,
+        // but the server's encoder puts an MBAP length one byte short on the
+        // FC17 response (README, finding 7), so the server refuses FC17 with
+        // exception 1; the client decodes it as it should.
+        .boolean("serverDiagnostics", false)
+        .boolean("serverReportServerId", false)
+        .boolean("serverFileRecord", false)
+        .boolean("serverFifoQueue", false)
+        .boolean("clientDiagnostics", false)
+        .boolean("clientReportServerId", true)
+        .boolean("clientReadFileRecord", false)
+        .boolean("clientWriteFileRecord", false)
+        .boolean("clientFifoQueue", false)
+        // A function code the library does not know is decoded as `Custom`,
+        // whatever its length: the MBAP length frames it.
+        .boolean("clientRawAnyResponse", true)
         .end();
     let operations: Vec<String> = args::OPERATIONS.iter().map(|o| json::quote(o)).collect();
     Obj::new()

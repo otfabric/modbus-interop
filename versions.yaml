@@ -4,8 +4,8 @@
 # scripts/check-versions.sh fails when this file disagrees with them.
 
 interop_version: "0.1.0"
-contract_version: "1.0"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
-fixture_schema: "1.0"          # fixtures/schema/modbus-fixture.schema.json
+contract_version: "1.1"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
+fixture_schema: "1.1"          # fixtures/schema/modbus-fixture.schema.json
 
 protocol:
   name: "Modbus TCP"
@@ -30,9 +30,9 @@ implementations:
     upstream: "PyModbus"
     repository: "https://github.com/pymodbus-dev/pymodbus"
     artifact: "pypi:pymodbus"
-    version: "3.15.0"
-    revision: "39949d726efa67411a4feed664736de05c073f16"   # tag v3.15.0; information, the build installs the wheel
-    wheel_sha256: "74d8dee961f23845f18a8481253183504dca05c4fcd102890cd28f4d7ce09267"
+    version: "3.16.1"
+    revision: "804ae510d400e7690d86c8a1f648fa3f6c940330"   # tag v3.16.1; information, the build installs the wheel
+    wheel_sha256: "bb433f7417280bdea1190d95495aa6fb8e1fa8e0d720c436922b270bc378024c"
     license: "BSD-3-Clause"
     language: "Python"
     independent_engine: true

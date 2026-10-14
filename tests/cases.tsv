@@ -15,7 +15,9 @@
 # expectation, all pairings must produce the same result document.
 #
 # Baseline: coils 0..1999, discrete inputs 1000..2999, holding registers
-# 0..255, input registers 65280..65535, unit identifier 1.
+# 0..255, input registers 65280..65535, unit identifier 1; server ID 42;
+# file 1 with 200 records, file 2 with 4; FIFO queues at 1246 (2 values),
+# 100 (31 values) and 101 (empty).
 ro	0	ok=true error=- exc=- fc=1 n=1	-	read-coils --address 0 --quantity 1
 ro	0	ok=true error=- exc=- fc=1 n=7	-	read-coils --address 1993 --quantity 7
 ro	0	ok=true error=- exc=- fc=1 n=2000	-	read-coils --address 0 --quantity 2000
@@ -57,6 +59,23 @@ ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverReadWriteMultiple,clie
 ro	0	ok=true error=- exc=- fc=43 n=3	server:serverDeviceIdentification,client:clientDeviceIdentification	read-device-identification
 ro	0	ok=true error=- exc=- fc=43 n=7	server:serverDeviceIdentification,client:clientDeviceIdentification	read-device-identification --category regular
 ro	0	ok=true error=- exc=- fc=43 n=7	server:serverDeviceIdentification,client:clientDeviceIdentification	read-device-identification --category extended
+ro	0	ok=true error=- exc=- fc=8 n=0	server:serverDiagnostics,client:clientDiagnostics	diagnostics --sub-function 0 --data a537
+ro	1	ok=false error=exception exc=1 fc=- n=0	server:serverDiagnostics,client:clientDiagnostics	diagnostics --sub-function 257 --data 0000
+ro	0	ok=true error=- exc=- fc=8 n=0	server:serverDiagnostics,client:clientRaw,client:clientRawAnyResponse	raw --function 8 --data 0000a537
+ro	0	ok=true error=- exc=- fc=17 n=0	server:serverReportServerId,client:clientReportServerId	report-server-id
+ro	0	ok=true error=- exc=- fc=20 n=2	server:serverFileRecord,client:clientReadFileRecord	read-file-record --file 1 --record 0 --length 2
+ro	0	ok=true error=- exc=- fc=20 n=120	server:serverFileRecord,client:clientReadFileRecord	read-file-record --file 1 --record 80 --length 120
+ro	0	ok=true error=- exc=- fc=20 n=4	server:serverFileRecord,client:clientReadFileRecord	read-file-record --file 2 --record 0 --length 4
+ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverFileRecord,client:clientReadFileRecord	read-file-record --file 3 --record 0 --length 2
+ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverFileRecord,client:clientReadFileRecord	read-file-record --file 1 --record 198 --length 4
+ro	0	ok=true error=- exc=- fc=20 n=0	server:serverFileRecord,client:clientRaw,client:clientRawAnyResponse	raw --function 20 --data 0706000100000002
+ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverFileRecord,client:clientWriteFileRecord	write-file-record --file 3 --record 0 --values 1
+ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverFileRecord,client:clientWriteFileRecord	write-file-record --file 2 --record 3 --values 7,8
+ro	0	ok=true error=- exc=- fc=24 n=2	server:serverFifoQueue,client:clientFifoQueue	read-fifo-queue --address 1246
+ro	0	ok=true error=- exc=- fc=24 n=31	server:serverFifoQueue,client:clientFifoQueue	read-fifo-queue --address 100
+ro	0	ok=true error=- exc=- fc=24 n=0	server:serverFifoQueue,client:clientFifoQueue	read-fifo-queue --address 101
+ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverFifoQueue,client:clientFifoQueue	read-fifo-queue --address 102
+ro	0	ok=true error=- exc=- fc=24 n=0	server:serverFifoQueue,client:clientRaw,client:clientRawAnyResponse	raw --function 24 --data 04de
 rw	0	ok=true error=- exc=- fc=5 n=0	-	write-single-coil --address 5 --value true
 rw	0	ok=true error=- exc=- fc=5 n=0	-	write-single-coil --address 1999 --value false
 rw	0	ok=true error=- exc=- fc=6 n=0	-	write-single-register --address 10 --value 4660
@@ -65,3 +84,4 @@ rw	0	ok=true error=- exc=- fc=15 n=0	-	write-multiple-coils --address 100 --valu
 rw	0	ok=true error=- exc=- fc=16 n=0	-	write-multiple-registers --address 20 --values 1,2,65535
 rw	0	ok=true error=- exc=- fc=22 n=0	server:serverMaskWrite,client:clientMaskWrite	mask-write-register --address 5 --and-mask 0x00F2 --or-mask 0x0025
 rw	0	ok=true error=- exc=- fc=23 n=4	server:serverReadWriteMultiple,client:clientReadWriteMultiple	read-write-multiple-registers --read-address 30 --read-quantity 4 --write-address 31 --values 7,8
+rw	0	ok=true error=- exc=- fc=21 n=0	server:serverFileRecord,client:clientWriteFileRecord	write-file-record --file 1 --record 5 --values 1,2,65535

@@ -39,7 +39,7 @@ namespace ModbusInterop.NModbusAdapter
         private static readonly HashSet<string> RootKeys = new HashSet<string>(StringComparer.Ordinal)
         {
             "schemaVersion", "name", "description", "unitId", "coils", "discreteInputs", "holdingRegisters",
-            "inputRegisters", "deviceIdentification",
+            "inputRegisters", "deviceIdentification", "reportServerId", "fileRecords", "fifoQueues",
         };
 
         private Fixture(string name, byte unitId)
@@ -129,6 +129,9 @@ namespace ModbusInterop.NModbusAdapter
             fixture.HoldingRegisters = RegisterBlock(root, "holdingRegisters");
             fixture.InputRegisters = RegisterBlock(root, "inputRegisters");
             DeviceIdentification(root);
+            ReportServerId(root);
+            Tables(root, "fileRecords", "file", 1, "records", 1, 10000);
+            Tables(root, "fifoQueues", "address", 0, "values", 0, 31);
             return fixture;
         }
 
@@ -336,6 +339,86 @@ namespace ModbusInterop.NModbusAdapter
                 if (!ids.Contains(basic))
                 {
                     throw new FixtureException(where + ": basic object " + basic + " is missing");
+                }
+            }
+        }
+
+        /// <summary>
+        /// reportServerId (FC17). Checked only: the server does not serve FC17
+        /// (serverReportServerId is false), but a fixture with an invalid one
+        /// is still refused.
+        /// </summary>
+        private static void ReportServerId(JsonElement root)
+        {
+            if (!root.TryGetProperty("reportServerId", out JsonElement element))
+            {
+                return;
+            }
+
+            const string where = "reportServerId";
+            Object(element, where, new[] { "serverId", "runIndicator" });
+            if (!element.TryGetProperty("serverId", out JsonElement serverId))
+            {
+                throw new FixtureException(where + ": serverId is required");
+            }
+
+            Integer(serverId, where + ".serverId", 0, 255);
+            if (!element.TryGetProperty("runIndicator", out JsonElement run)
+                || (run.ValueKind != JsonValueKind.True && run.ValueKind != JsonValueKind.False))
+            {
+                throw new FixtureException(where + ": runIndicator must be a boolean");
+            }
+        }
+
+        /// <summary>
+        /// fileRecords (FC20/FC21) and fifoQueues (FC24): a non-empty array of
+        /// objects, each a unique key and an array of registers. Checked only:
+        /// the server serves neither (serverFileRecord, serverFifoQueue false).
+        /// </summary>
+        private static void Tables(JsonElement root, string where, string key, int minKey, string list, int minItems, int maxItems)
+        {
+            if (!root.TryGetProperty(where, out JsonElement tables))
+            {
+                return;
+            }
+
+            if (tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() < 1)
+            {
+                throw new FixtureException(where + " must be an array with at least 1 item");
+            }
+
+            var keys = new HashSet<int>();
+            int t = 0;
+            foreach (JsonElement table in tables.EnumerateArray())
+            {
+                string item = where + "[" + t++ + "]";
+                Object(table, item, new[] { key, list });
+                if (!table.TryGetProperty(key, out JsonElement keyElement))
+                {
+                    throw new FixtureException(item + ": " + key + " is required");
+                }
+
+                int number = Integer(keyElement, item + "." + key, minKey, 65535);
+                if (!keys.Add(number))
+                {
+                    throw new FixtureException(where + ": " + key + " " + number + " is not unique");
+                }
+
+                if (!table.TryGetProperty(list, out JsonElement values) || values.ValueKind != JsonValueKind.Array)
+                {
+                    throw new FixtureException(item + ": " + list + " must be an array");
+                }
+
+                int count = values.GetArrayLength();
+                if (count < minItems || count > maxItems)
+                {
+                    throw new FixtureException(item + ": " + list + " must have " + minItems + ".." + maxItems + " items");
+                }
+
+                int i = 0;
+                foreach (JsonElement value in values.EnumerateArray())
+                {
+                    Integer(value, item + "." + list + "[" + i++ + "]", 0, 65535);
                 }
             }
         }

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -39,7 +40,8 @@ final class Fixture {
     private static final Pattern PRINTABLE = Pattern.compile("[\\x20-\\x7e]*");
     private static final Set<String> ROOT_KEYS = Set.of(
             "schemaVersion", "name", "description", "unitId",
-            "coils", "discreteInputs", "holdingRegisters", "inputRegisters", "deviceIdentification");
+            "coils", "discreteInputs", "holdingRegisters", "inputRegisters", "deviceIdentification",
+            "reportServerId", "fileRecords", "fifoQueues");
 
     final String name;
     final int unitId;
@@ -86,6 +88,17 @@ final class Fixture {
         inputRegisters = registers(root, "inputRegisters");
         if (root.has("deviceIdentification")) {
             checkDeviceIdentification(root.get("deviceIdentification"));
+        }
+        // Validated although the server does not serve FC17, FC20, FC21 or FC24: the library has no
+        // PDU for them, but a fixture with them must load (and an invalid one must not).
+        if (root.has("reportServerId")) {
+            checkReportServerId(root.get("reportServerId"));
+        }
+        if (root.has("fileRecords")) {
+            checkKeyedArrays(root.get("fileRecords"), "fileRecords", "file", 1, 65535, "records", 1, 10000);
+        }
+        if (root.has("fifoQueues")) {
+            checkKeyedArrays(root.get("fifoQueues"), "fifoQueues", "address", 0, 65535, "values", 0, 31);
         }
 
         // The cross-field rules of scripts/validate-fixtures.py.
@@ -213,6 +226,68 @@ final class Fixture {
         int end = address + count - 1;
         if (end > 65535) {
             throw new FixtureException(table + ": block ends at " + end + ", past address 65535");
+        }
+    }
+
+    private static void onlyKeys(JsonObject object, String what, Set<String> keys) throws FixtureException {
+        for (String key : object.keySet()) {
+            if (!keys.contains(key)) {
+                throw new FixtureException(what + ": unknown property '" + key + "'");
+            }
+        }
+    }
+
+    private static void checkReportServerId(JsonElement e) throws FixtureException {
+        String what = "reportServerId";
+        if (!e.isJsonObject()) {
+            throw new FixtureException(what + " must be an object");
+        }
+        JsonObject report = e.getAsJsonObject();
+        onlyKeys(report, what, Set.of("serverId", "runIndicator"));
+        if (!report.has("serverId") || !report.has("runIndicator")) {
+            throw new FixtureException(what + " needs serverId and runIndicator");
+        }
+        integer(report.get("serverId"), what + ".serverId", 0, 255);
+        JsonElement run = report.get("runIndicator");
+        if (!run.isJsonPrimitive() || !run.getAsJsonPrimitive().isBoolean()) {
+            throw new FixtureException(what + ".runIndicator must be a boolean");
+        }
+    }
+
+    /**
+     * {@code fileRecords} and {@code fifoQueues}: a non-empty array of objects, each with a unique
+     * integer key and an array of 0..65535 registers of {@code minItems..maxItems} items.
+     */
+    private static void checkKeyedArrays(JsonElement e, String what, String key, int keyMin, int keyMax,
+            String list, int minItems, int maxItems) throws FixtureException {
+        if (!e.isJsonArray() || e.getAsJsonArray().isEmpty()) {
+            throw new FixtureException(what + " must be a non-empty array");
+        }
+        Set<Integer> keys = new HashSet<>();
+        int index = 0;
+        for (JsonElement item : e.getAsJsonArray()) {
+            String at = what + "[" + index++ + "]";
+            if (!item.isJsonObject()) {
+                throw new FixtureException(at + " must be an object");
+            }
+            JsonObject object = item.getAsJsonObject();
+            onlyKeys(object, at, Set.of(key, list));
+            if (!object.has(key) || !object.has(list)) {
+                throw new FixtureException(at + " needs " + key + " and " + list);
+            }
+            int k = integer(object.get(key), at + "." + key, keyMin, keyMax);
+            if (!keys.add(k)) {
+                throw new FixtureException(what + ": " + key + " " + k + " is not unique");
+            }
+            JsonElement values = object.get(list);
+            if (!values.isJsonArray() || values.getAsJsonArray().size() < minItems
+                    || values.getAsJsonArray().size() > maxItems) {
+                throw new FixtureException(at + "." + list + " must be an array of " + minItems + ".." + maxItems + " items");
+            }
+            int i = 0;
+            for (JsonElement value : values.getAsJsonArray()) {
+                integer(value, at + "." + list + "[" + i++ + "]", 0, 65535);
+            }
         }
     }
 

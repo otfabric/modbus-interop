@@ -215,6 +215,80 @@ static int check_identification(const cJSON *root, char *err, size_t size)
     return 0;
 }
 
+/* The server answers FC17, FC20, FC21 and FC24 with exception 1 (see
+   server.c), but a fixture whose reportServerId, fileRecords or fifoQueues
+   are invalid is still an invalid fixture. */
+static int check_report_server_id(const cJSON *root, char *err, size_t size)
+{
+    static const char *const keys[] = {"serverId", "runIndicator", NULL};
+    const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, "reportServerId");
+    long id;
+
+    if (item == NULL)
+        return 0;
+    if (!cJSON_IsObject(item))
+        return fail(err, size, "reportServerId: must be an object");
+    if (only_keys(item, keys, "reportServerId", err, size) != 0)
+        return -1;
+    if (integer_in(cJSON_GetObjectItemCaseSensitive(item, "serverId"), 0, 255, &id) != 0)
+        return fail(err, size, "reportServerId: serverId must be an integer 0..255");
+    if (!cJSON_IsBool(cJSON_GetObjectItemCaseSensitive(item, "runIndicator")))
+        return fail(err, size, "reportServerId: runIndicator must be a boolean");
+    return 0;
+}
+
+/* An array of at least one object {key: integer key_min..65535, list: array
+   of list_min..list_max integers 0..65535}, the keys unique. */
+static int check_keyed_lists(const cJSON *root, const char *table, const char *key, long key_min,
+                             const char *list, int list_min, int list_max, char *err, size_t size)
+{
+    const char *const keys[] = {key, list, NULL};
+    const cJSON *array = cJSON_GetObjectItemCaseSensitive(root, table);
+    const cJSON *entry;
+    int n = 0;
+
+    if (array == NULL)
+        return 0;
+    if (!cJSON_IsArray(array))
+        return fail(err, size, "%s: must be an array", table);
+    if (cJSON_GetArraySize(array) < 1)
+        return fail(err, size, "%s: must have at least one element", table);
+    cJSON_ArrayForEach(entry, array)
+    {
+        const cJSON *values, *value;
+        long k;
+        int length, i = 0;
+
+        if (!cJSON_IsObject(entry))
+            return fail(err, size, "%s[%d]: must be an object", table, n);
+        if (only_keys(entry, keys, table, err, size) != 0)
+            return -1;
+        if (integer_in(cJSON_GetObjectItemCaseSensitive(entry, key), key_min, 65535, &k) != 0)
+            return fail(err, size, "%s[%d]: %s must be an integer %ld..65535", table, n, key, key_min);
+        /* The entries before this one are valid: their keys are integers. */
+        for (const cJSON *earlier = array->child; earlier != entry; earlier = earlier->next) {
+            if ((long) cJSON_GetObjectItemCaseSensitive(earlier, key)->valuedouble == k)
+                return fail(err, size, "%s: %s %ld is given twice", table, key, k);
+        }
+        values = cJSON_GetObjectItemCaseSensitive(entry, list);
+        if (!cJSON_IsArray(values))
+            return fail(err, size, "%s[%d]: %s must be an array", table, n, list);
+        length = cJSON_GetArraySize(values);
+        if (length < list_min || length > list_max)
+            return fail(err, size, "%s[%d]: %s must have %d..%d elements", table, n, list, list_min, list_max);
+        cJSON_ArrayForEach(value, values)
+        {
+            long v;
+
+            if (integer_in(value, 0, 65535, &v) != 0)
+                return fail(err, size, "%s[%d]: %s[%d] must be an integer 0..65535", table, n, list, i);
+            i++;
+        }
+        n++;
+    }
+    return 0;
+}
+
 static int valid_name(const char *name)
 {
     size_t len = strlen(name);
@@ -229,7 +303,8 @@ static int load_document(const cJSON *root, const char *directory, fixture_t *fx
 {
     static const char *const keys[] = {"schemaVersion", "name", "description", "unitId",
                                        "coils", "discreteInputs", "holdingRegisters",
-                                       "inputRegisters", "deviceIdentification", NULL};
+                                       "inputRegisters", "deviceIdentification", "reportServerId",
+                                       "fileRecords", "fifoQueues", NULL};
     const cJSON *item;
     long unit;
 
@@ -260,7 +335,11 @@ static int load_document(const cJSON *root, const char *directory, fixture_t *fx
         load_block(root, "holdingRegisters", 0, &fx->holding_registers, err, size) != 0 ||
         load_block(root, "inputRegisters", 0, &fx->input_registers, err, size) != 0)
         return -1;
-    return check_identification(root, err, size);
+    if (check_identification(root, err, size) != 0 || check_report_server_id(root, err, size) != 0 ||
+        check_keyed_lists(root, "fileRecords", "file", 1, "records", 1, 10000, err, size) != 0 ||
+        check_keyed_lists(root, "fifoQueues", "address", 0, "values", 0, 31, err, size) != 0)
+        return -1;
+    return 0;
 }
 
 int fixture_load(const char *path, fixture_t *fx, char *err, size_t err_size)

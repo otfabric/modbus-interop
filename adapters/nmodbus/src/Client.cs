@@ -169,7 +169,20 @@ namespace ModbusInterop.NModbusAdapter
         {
             "read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers",
             "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
-            "read-write-multiple-registers", "read-device-identification", "raw",
+            "read-write-multiple-registers", "read-device-identification", "write-file-record", "raw",
+        };
+
+        /// <summary>
+        /// Operations of the contract NModbus has no Modbus TCP API for, and
+        /// why. Each is a usage error: nothing is sent.
+        /// </summary>
+        private static readonly Dictionary<string, string> Unsupported = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["mask-write-register"] = "NModbus has no Mask Write Register (22)",
+            ["diagnostics"] = "NModbus has no Diagnostics (08) for Modbus TCP: ReturnQueryData is on the serial master only",
+            ["report-server-id"] = "NModbus has no Report Server ID (17)",
+            ["read-file-record"] = "NModbus has no Read File Record (20)",
+            ["read-fifo-queue"] = "NModbus has no Read FIFO Queue (24)",
         };
 
         private static readonly string[] Common = { "host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat" };
@@ -182,9 +195,9 @@ namespace ModbusInterop.NModbusAdapter
             }
 
             string operation = args[1];
-            if (operation == "mask-write-register")
+            if (Unsupported.TryGetValue(operation, out string? reason))
             {
-                throw new UsageException("mask-write-register is not supported: NModbus has no Mask Write Register (22)");
+                throw new UsageException(operation + " is not supported: " + reason);
             }
 
             if (!Operations.Contains(operation))
@@ -367,6 +380,7 @@ namespace ModbusInterop.NModbusAdapter
                 case "write-multiple-registers": return 16;
                 case "read-write-multiple-registers": return 23;
                 case "read-device-identification": return 43;
+                case "write-file-record": return 21;
                 default: return flags.Number("function", 1, 127);
             }
         }
@@ -390,6 +404,8 @@ namespace ModbusInterop.NModbusAdapter
                     return new[] { "read-address", "read-quantity", "write-address", "values" };
                 case "read-device-identification":
                     return new[] { "category" };
+                case "write-file-record":
+                    return new[] { "file", "record", "values" };
                 default:
                     return new[] { "function", "data" };
             }
@@ -553,6 +569,39 @@ namespace ModbusInterop.NModbusAdapter
                     }
 
                     return session => DeviceIdentification(session, unit, category);
+                }
+
+                case "write-file-record":
+                {
+                    ushort file = (ushort)flags.Number("file", 1, 65535);
+                    ushort record = (ushort)flags.Number("record", 0, 9999);
+                    ushort[] values = RegisterList(flags.Text("values"), 122);
+                    byte[] data = new byte[values.Length * 2];
+                    for (int i = 0; i < values.Length; i++)
+                    {
+                        data[2 * i] = (byte)(values[i] >> 8);
+                        data[2 * i + 1] = (byte)values[i];
+                    }
+
+                    return session =>
+                    {
+                        // One sub-request, reference type 6. NModbus compares
+                        // the file number and record number of the echo with
+                        // the request and hands nothing out: these are the
+                        // values it confirmed.
+                        session.Exchange(m =>
+                        {
+                            m.WriteFileRecord(unit, file, record, data);
+                            return true;
+                        });
+                        return Output.Text(w =>
+                        {
+                            w.WriteNumber("function", 21);
+                            w.WriteNumber("file", file);
+                            w.WriteNumber("record", record);
+                            w.WriteNumber("quantity", values.Length);
+                        });
+                    };
                 }
 
                 default:

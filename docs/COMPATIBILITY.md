@@ -10,7 +10,7 @@ capabilities come from `print-capabilities` of each image.
 | Adapter | Upstream | Version | Released | Licence | Language |
 |---------|----------|---------|----------|---------|----------|
 | `libmodbus` | [libmodbus](https://github.com/stephane/libmodbus) | v3.2.0 (`a9b025d1`) | 2026-07-02 | LGPL-2.1-or-later | C |
-| `pymodbus` | [PyModbus](https://github.com/pymodbus-dev/pymodbus) | 3.15.0 | 2026-08-13 | BSD-3-Clause | Python |
+| `pymodbus` | [PyModbus](https://github.com/pymodbus-dev/pymodbus) | 3.16.1 | 2026-10-11 | BSD-3-Clause | Python |
 | `digitalpetri` | [digitalpetri/modbus](https://github.com/digitalpetri/modbus) | 2.1.6 | 2026-08-08 | EPL-2.0 | Java |
 | `nmodbus` | [NModbus](https://github.com/NModbus/NModbus) | 3.0.83 | 2026-04-16 | MIT | C# |
 | `tokiomodbus` | [tokio-modbus](https://github.com/slowtec/tokio-modbus) | 0.17.0 | 2025-10-22 | MIT OR Apache-2.0 | Rust |
@@ -24,7 +24,7 @@ that is new in it: `digitalpetri` (raw request hooks, 2.1.6) and
 `tokiomodbus` (Read Device Identification, 0.16.4; 0.16.2 to 0.16.5 are
 yanked). `nmodbus` needs 3.0.83 for its device-identification client types;
 NModbus 4.0 is a pre-release of a different API. `libmodbus` and `pymodbus`
-also build and pass on the release before (v3.1.12 and 3.14.0).
+also build and pass on the release before (v3.1.12 and 3.15.0).
 
 ## Capabilities
 
@@ -44,10 +44,33 @@ also build and pass on the release before (v3.1.12 and 3.14.0).
 | `clientRaw` | yes | yes | yes | yes | yes |
 | `clientRepeat` | yes | yes | yes | yes | yes |
 | `clientUnitIdCheck` | **no** | yes | **no** | yes | yes |
+| `serverDiagnostics` (FC08, Return Query Data) | **no** | yes | **no** | yes ² | **no** |
+| `serverReportServerId` (FC17) | **no** ³ | yes | **no** | **no** | **no** ⁴ |
+| `serverFileRecord` (FC20, FC21) | **no** | yes | **no** | **no** | **no** |
+| `serverFifoQueue` (FC24) | **no** | yes | **no** | **no** | **no** |
+| `clientDiagnostics` | **no** | yes | **no** | **no** | **no** |
+| `clientReportServerId` | yes | yes | **no** | **no** | yes |
+| `clientReadFileRecord` | **no** | yes | **no** | **no** | **no** |
+| `clientWriteFileRecord` | **no** | yes | **no** | yes | **no** |
+| `clientFifoQueue` | **no** | yes | **no** | **no** | **no** |
+| `clientRawAnyResponse` | **no** | yes | yes | yes | yes |
 
 ¹ The behaviour comes from adapter code placed in front of the library
 through its public extension points, not from the library as shipped. What
 the library does by itself is under [Findings](#findings).
+² The library's own FC08 service, behind an adapter check: it echoes exactly
+one data word, so other lengths are answered with exception 3.
+³ libmodbus answers FC17 with its own fixed identity, which cannot follow a
+fixture; the adapter answers exception 1.
+⁴ The tokio-modbus 0.17.0 server frames its FC17 response with an MBAP
+length one byte short (see [Findings](#findings)); the adapter answers
+exception 1.
+
+FC08, FC17, FC20, FC21 and FC24 differ most between the stacks. No stack
+but PyModbus has typed support for all of them; digitalpetri/modbus 2.1.6
+has none. tokio-modbus has typed FC20, FC21 and FC24 on its main branch, not
+yet released. Where a library offers only raw bytes for a function, the
+adapter does not encode it: `raw` sends it instead.
 
 A reference server is useful to a consumer only if it behaves as
 [FIXTURES.md](FIXTURES.md) says, so the adapters make their devices do that
@@ -106,7 +129,7 @@ consumer should not rely on what an image does with one.
 ### PyModbus answers with function code 0x80
 
 For a function code it does not know, and for a read whose quantity is 0 or
-above the maximum, PyModbus 3.15.0 answers `80 01`: function code `0x80`
+above the maximum, PyModbus 3.16.1 answers `80 01`: function code `0x80`
 instead of the request's function code plus `0x80`, and exception 1 also
 where the spec asks for 3. A client that validates the function code of a
 response reports this as an invalid response (libmodbus and NModbus do); the
@@ -187,6 +210,57 @@ as the adapter is; with `panic = "abort"` the server process ends.
 - Over-limit writes (FC16 above 123 registers, FC23 above 121 written) close
   the connection before the service sees them, so `serverQuantityCheck` is
   true for the reads and for quantity 0, not for those.
+
+### Diagnostics, Report Server ID, file records and FIFO queues
+
+What the libraries do with FC08, FC17, FC20, FC21 and FC24, as shipped:
+
+| Situation | libmodbus | PyModbus | digitalpetri | NModbus | tokio-modbus |
+|-----------|-----------|----------|--------------|---------|--------------|
+| Client API | FC17 only | all five | none | FC21 only (one sub-request) | FC17 only |
+| Server, as shipped | FC17 with a fixed identity (`B4 FF "LMB3.2.0"`); others exception 1 | FC08 echoes and counters that never count; FC17 from the identity objects; FC20 a dummy record; FC21 echoes and stores nothing; FC24 always `0, 1, 2, 3` | closes the connection | FC08 echoes one data word, whatever the sub-function; FC17 closes; FC21 exception 4 | FC17 with a broken frame; others to the service |
+| `raw` receives a normal response of FC08, FC20, FC21, FC24 | no: frames by function code | yes | yes | yes | yes |
+
+Details:
+
+- **PyModbus server, FC20:** the request decoder takes the record length in
+  registers for a length in bytes and halves it, so a request for an odd
+  number of registers is answered `80 01` and never reaches the device. The
+  self-tests read even lengths only; a consumer should do the same against
+  this server.
+- **PyModbus server, FC08:** an unknown sub-function is answered with
+  exception 4 as shipped; the adapter answers exception 1.
+- **PyModbus server, FC20/FC21:** the request decoders drop the reference
+  type, so a sub-request with a type other than 6 is served as type 6 (and an
+  FC21 echo carries 06); the spec asks for exception 2. Not in the
+  self-tests; a consumer should not rely on it.
+- **PyModbus server, FC17 as shipped** answers the identity objects joined by
+  `-`, or `Pymodbus`, with the run indicator on; the adapter answers the
+  fixture.
+- **PyModbus client, FC17:** the last byte inside the byte count is taken as
+  the run indicator, so additional data ends up in the server ID, and a run
+  indicator other than 00/FF is lost.
+- **PyModbus client, FC08:** for sub-functions other than 0 the data is
+  decoded as words, an odd length padded with ASCII `0`; the adapter cuts it
+  back to the frame.
+- **PyModbus client, FC20/FC24:** `FileRecord.record_length` is in bytes on
+  the request side; the FC24 decoder ignores the byte count and the limit of
+  31 values. The adapter checks both.
+- **PyModbus client, FC17:** 3.15.0 put the run indicator into the server
+  ID; fixed in 3.16.1.
+- **NModbus client, FC21:** only the file and record number of the echo are
+  compared: an echo with another reference type or other data is accepted.
+- **NModbus server, FC08:** the library's service keeps exactly one data
+  word: a longer request gets a truncated echo, a shorter one closes the
+  connection. The adapter answers other lengths with exception 3 and other
+  sub-functions with exception 1.
+- **tokio-modbus server, FC17:** `response_pdu_size` counts
+  `ReportServerId(_, _, data)` as `3 + data.len()`, but the PDU is
+  `4 + data.len()`, so the MBAP length is one short:
+  `0001 0000 0004 01 11 02 2a ff`. A request with any data byte after the
+  function code closes the connection.
+- **tokio-modbus:** FC20, FC21 and FC24 are typed on the main branch
+  (unreleased); FC08 is not.
 
 ## Platforms
 

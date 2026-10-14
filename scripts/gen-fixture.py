@@ -17,6 +17,8 @@ holding = [0, 1, 32767, 32768, 65535, 4660, 43981, 255]
 holding += [(i * 257 + 13) % 65536 for i in range(len(holding), 256)]
 inputs = [65535, 0, 32768, 1]
 inputs += [(i * 263 + 7) % 65536 for i in range(len(inputs), 256)]
+file1 = [(i * 409 + 11) % 65536 for i in range(200)]
+fifo31 = [(i * 1031 + 5) % 65536 for i in range(31)]
 
 fixture = {
     "schemaVersion": "1.0",
@@ -39,6 +41,16 @@ fixture = {
             {"id": 6, "value": "interop"},
         ]
     },
+    "reportServerId": {"serverId": 42, "runIndicator": True},
+    "fileRecords": [
+        {"file": 1, "records": file1},
+        {"file": 2, "records": [1, 2, 3, 65535]},
+    ],
+    "fifoQueues": [
+        {"address": 1246, "values": [440, 4740]},
+        {"address": 100, "values": fifo31},
+        {"address": 101, "values": []},
+    ],
 }
 
 

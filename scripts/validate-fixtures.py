@@ -8,7 +8,8 @@ Two layers, both required:
      it, so a missing package is an error there (--require-schema).
   2. The cross-field rules a JSON Schema cannot express: the name matches the
      directory, a block ends at or before address 65535, device identification
-     objects are unique, in ascending order and include the basic ones.
+     objects are unique, in ascending order and include the basic ones, file
+     numbers and FIFO queue addresses are unique.
 
 The adapters apply the same rules when they load a fixture; this script makes
 a broken fixture fail before any image is built.
@@ -47,6 +48,12 @@ def semantic_errors(fx, path):
         for i in ids:
             if isinstance(i, int) and 7 <= i <= 127:
                 errors.append(f"deviceIdentification: object id {i} is reserved")
+    files = [f.get("file") for f in fx.get("fileRecords", []) if isinstance(f, dict)]
+    if len(files) != len(set(files)):
+        errors.append("fileRecords: file numbers must be unique")
+    queues = [q.get("address") for q in fx.get("fifoQueues", []) if isinstance(q, dict)]
+    if len(queues) != len(set(queues)):
+        errors.append("fifoQueues: addresses must be unique")
     return errors
 
 

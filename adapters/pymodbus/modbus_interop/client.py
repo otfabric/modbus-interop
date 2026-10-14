@@ -16,6 +16,8 @@ import time
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ConnectionException, ModbusException, ModbusIOException
 from pymodbus.pdu import ModbusPDU
+from pymodbus.pdu.diag_message import DiagnosticBase
+from pymodbus.pdu.file_message import FileRecord
 
 from . import ADAPTER, SCHEMA_VERSION
 
@@ -31,7 +33,16 @@ FUNCTIONS = {
     "mask-write-register": 22,
     "read-write-multiple-registers": 23,
     "read-device-identification": 43,
+    "diagnostics": 8,
+    "report-server-id": 17,
+    "read-file-record": 20,
+    "write-file-record": 21,
+    "read-fifo-queue": 24,
 }
+RETURN_QUERY_DATA = 0x0000
+RUN_INDICATOR_ON = 0xFF
+MBAP_SIZE = 7
+MAX_FIFO_COUNT = 31
 CATEGORIES = {"basic": 1, "regular": 2, "extended": 3}
 MORE_FOLLOWS = 0xFF
 MAX_IDENTIFICATION_REQUESTS = 256  # one per object at worst: the stream cannot loop forever
@@ -85,6 +96,7 @@ class Session:
         self.responses = 0
         self.connected = False
         self.received = 0  # bytes received since the last request was sent
+        self.receive_buffer = b""  # what PyModbus last framed from: the response is at its start
         self.lost = asyncio.Event()
         self.client: AsyncModbusTcpClient | None = None
         self.raw_class = raw_pdu_class(params["function"]) if operation == "raw" else None
@@ -93,6 +105,7 @@ class Session:
     def on_packet(self, sending: bool, data: bytes) -> bytes:
         if not sending:
             self.received += len(data)
+            self.receive_buffer = bytes(data)
         return data
 
     def on_connect(self, connected: bool) -> None:
@@ -137,6 +150,7 @@ class Session:
         if self.lost.is_set() or not self.client.connected:
             raise Failure("connection-lost", "the connection is closed")
         self.received = 0
+        self.receive_buffer = b""
         try:
             coroutine = call()
         except ConnectionException as exc:
@@ -256,6 +270,44 @@ class Session:
             return {"function": 23, "registers": [int(v) for v in r.registers]}
         if op == "read-device-identification":
             return await self.read_device_identification()
+        if op == "diagnostics":
+            return await self.diagnostics()
+        if op == "report-server-id":
+            r = await self.exchange(17, lambda: c.report_device_id(device_id=unit))
+            # PyModbus hands out the bytes between the byte count and the
+            # last byte as identifier and the last byte as a boolean status.
+            identifier = bytes(r.identifier)
+            return {"function": 17, "data": (identifier + bytes([RUN_INDICATOR_ON if r.status else 0])).hex()}
+        if op == "read-file-record":
+            count = p["length"]
+            # FileRecord takes record_length in bytes.
+            request = FileRecord(file_number=p["file"], record_number=p["record"], record_length=2 * count)
+            r = await self.exchange(20, lambda: c.read_file_record([request], device_id=unit))
+            self.check(len(r.records) == 1, f"{len(r.records)} sub-responses to one sub-request")
+            data = bytes(r.records[0].record_data)
+            self.check(len(data) == 2 * count, f"{len(data)} bytes of record data for {count} registers")
+            return {"function": 20, "registers": [int.from_bytes(data[i:i + 2], "big") for i in range(0, len(data), 2)]}
+        if op == "write-file-record":
+            data = b"".join(v.to_bytes(2, "big") for v in p["values"])
+            request = FileRecord(file_number=p["file"], record_number=p["record"], record_data=data)
+            r = await self.exchange(21, lambda: c.write_file_record([request], device_id=unit))
+            echo = r.records[0] if len(r.records) == 1 else None
+            self.check(echo is not None and echo.file_number == p["file"] and echo.record_number == p["record"]
+                       and echo.record_length == len(p["values"]) and bytes(echo.record_data) == data,
+                       "the response does not echo the request")
+            return {"function": 21, "file": echo.file_number, "record": echo.record_number, "quantity": echo.record_length}
+        if op == "read-fifo-queue":
+            r = await self.exchange(24, lambda: c.read_fifo_queue(address=p["address"], device_id=unit))
+            values = [int(v) for v in r.values]
+            # PyModbus' decoder reads the FIFO count and ignores the byte
+            # count and the limit of 31: both are checked here, on the frame
+            # PyModbus decoded.
+            pdu = self.response_pdu()
+            self.check(len(values) <= MAX_FIFO_COUNT, f"FIFO count {len(values)} is above {MAX_FIFO_COUNT}")
+            self.check(pdu is not None and len(pdu) == 5 + 2 * len(values)
+                       and int.from_bytes(pdu[1:3], "big") == 2 + 2 * len(values),
+                       "the byte count or the length of the response does not match the FIFO count")
+            return {"function": 24, "registers": values}
         if op == "raw":
             assert self.raw_class is not None
             request = self.raw_class(p["data"], dev_id=unit)
@@ -264,6 +316,47 @@ class Session:
             self.check(isinstance(data, (bytes, bytearray)), "the response was not decoded as a raw PDU")
             return {"function": p["function"], "data": bytes(data).hex()}
         raise Failure("failed", f"operation {op} is not implemented")
+
+    def response_pdu(self) -> bytes | None:
+        """The PDU of the frame the response was decoded from, by its MBAP length."""
+        buffer = self.receive_buffer
+        if len(buffer) < MBAP_SIZE + 1:
+            return None
+        end = 6 + int.from_bytes(buffer[4:6], "big")
+        return buffer[MBAP_SIZE:end] if len(buffer) >= end else None
+
+    async def diagnostics(self) -> dict:
+        """FC08 with any sub-function: Return Query Data is the library's
+        own method, any other sub-function its DiagnosticBase with the
+        sub-function set."""
+        c, p, unit = self.client, self.params, self.unit_id
+        assert c is not None
+        sub, data = p["sub_function"], p["data"]
+        if sub == RETURN_QUERY_DATA:
+            r = await self.exchange(8, lambda: c.diag_query_data(data, device_id=unit))
+        else:
+            request = DiagnosticBase(message=data, dev_id=unit)
+            request.sub_function_code = sub
+            r = await self.exchange(8, lambda: c.execute(False, request))
+        self.check(r.sub_function_code == sub,
+                   f"the response is for sub-function {r.sub_function_code}, request was {sub}")
+        message = r.message
+        if isinstance(message, (bytes, bytearray)):
+            answer = bytes(message)
+        elif isinstance(message, int):
+            answer = message.to_bytes(2, "big")
+        elif isinstance(message, (list, tuple)):
+            answer = b"".join(int(v).to_bytes(2, "big") for v in message)
+        else:
+            answer = b""
+        # PyModbus decodes the data of other sub-functions as registers and
+        # pads an odd length; the frame says how many bytes there were.
+        pdu = self.response_pdu()
+        if pdu is not None and sub != RETURN_QUERY_DATA:
+            answer = answer[: max(len(pdu) - 3, 0)]
+        if sub == RETURN_QUERY_DATA:
+            self.check(answer == data, "the response does not echo the query data")
+        return {"function": 8, "subFunction": int(r.sub_function_code), "data": answer.hex()}
 
     def check(self, condition: bool, message: str) -> None:
         """A response PyModbus accepted but that does not answer the request."""
