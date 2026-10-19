@@ -6,7 +6,7 @@ If you discover a security vulnerability in `modbus-interop`, please report it r
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Instead, please email **security@otfabric.com**, or open a private advisory on GitHub (the [Security](https://github.com/otfabric/modbus-interop/security) tab → **Advisories** → **Report a vulnerability**), with a description, steps to reproduce and the affected image tag or digest.
+Instead, please email **security@otfabric.io**, or open a private advisory on GitHub (the [Security](https://github.com/otfabric/modbus-interop/security) tab → **Advisories** → **Report a vulnerability**), with a description, steps to reproduce and the affected image tag or digest.
 
 Vulnerabilities in the bundled implementations themselves (libmodbus, PyModbus, digitalpetri/modbus, NModbus, tokio-modbus) belong upstream; report them there, and tell us so that the pin can be moved.
 
