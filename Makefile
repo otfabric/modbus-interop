@@ -58,8 +58,9 @@ ci: validate lint images documents ## Full local CI: validate, lint, build, smok
 fixture: ## Regenerate fixtures/baseline/fixture.json from scripts/gen-fixture.py
 	@python3 scripts/gen-fixture.py
 
-validate: ## Validate every fixture against the schema and the cross-field rules; check versions.yaml
+validate: ## Validate every fixture against the schema and the cross-field rules; check versions.yaml and RELEASE.md
 	@scripts/check-versions.sh
+	@scripts/release-notes.sh > /dev/null && echo "ok   RELEASE.md has the notes of interop_version"
 	@python3 scripts/gen-fixture.py >/dev/null && git diff --quiet -- fixtures/baseline/fixture.json \
 		|| { echo "fixtures/baseline/fixture.json is not what scripts/gen-fixture.py generates"; exit 1; }
 	@echo "Validating fixtures..."

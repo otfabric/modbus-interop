@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Writes manifest.json and the body of the GitHub release.
+"""Writes manifest.json and the images part of the GitHub release body.
 
-    scripts/release-manifest.py <version> <commit> <digests file> <manifest out> <body out>
+    scripts/release-manifest.py <version> <commit> <digests file> <manifest out> <images out>
+
+The release workflow puts the notes of the version (scripts/release-notes.sh)
+in front of the images part.
 
 The digests file holds one "<adapter> <sha256:...>" line per published
 multi-arch image (make digests). Upstream pins are read from the adapter
