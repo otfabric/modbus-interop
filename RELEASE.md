@@ -1,6 +1,26 @@
 # modbus-interop Releases
 
+## How a release is made
+
+1. Write the notes of the version below and set `interop_version` in `versions.yaml` to it, in the same change. `make validate` (and CI) fails when RELEASE.md has no notes for `interop_version`.
+2. `make ci` on the commit to release.
+3. Tag `vX.Y.Z` and push the tag. The release workflow runs one job on an amd64 runner and one on an arm64 runner: each validates (including the notes of the tag), builds every image natively, runs the smoke and cross-stack self-tests on those images and pushes exactly them to GHCR as `<image>:vX.Y.Z-amd64` and `-arm64`. A last job joins the two into the multi-arch `<image>:vX.Y.Z` and creates the GitHub release with `manifest.json` (upstream pins and the digests of the multi-arch images) and `checksums.txt`.
+4. Consumers pin the digests from `manifest.json`.
+
+The notes are the body of the GitHub release, followed by the image digests:
+everything after the heading `## vX.Y.Z` up to the next line that is exactly
+`---` (`scripts/release-notes.sh vX.Y.Z` prints it). This is the format of
+every otfabric repository and the rule of the shared release workflow, so:
+one section per version, newest first, each ending with a `---` line, and no
+`---` line inside a section.
+
+Tags are immutable. A fix is a new version.
+
+---
+
 ## v0.2.0
+
+**Date:** 2026-10-14
 
 ## Summary
 
@@ -26,6 +46,8 @@ See the capability matrix in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). PyM
 ---
 
 ## v0.1.0
+
+**Date:** 2026-10-10
 
 ## Summary
 
@@ -60,3 +82,5 @@ deterministic device.
 - Modbus RTU, ASCII, UDP and TLS: Modbus TCP only.
 - Self-test cases that need a misbehaving peer (`clientUnitIdCheck`, `invalid-response`, `connection-lost`, requests split over TCP segments).
 - Cases for invalid writes (FC05 value, FC15/FC16 quantity and byte count): the stacks differ too much as shipped; their behaviour is recorded in the compatibility document.
+
+---
