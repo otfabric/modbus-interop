@@ -18,6 +18,25 @@ Tags are immutable. A fix is a new version.
 
 ---
 
+## v0.3.0
+
+**Date:** 2026-10-30
+
+**Previous release:** v0.2.0
+
+## Summary
+
+Self-test results as the organisation's interop-result-v1.
+
+## Changes
+
+### Added
+
+- **`reports/results.json`** ([interop-result-v1](schemas/interop-result-v1.schema.json)): `scripts/interop.sh` writes it when `REPORT_DIR` is set, with stable scenario IDs (a new column of `tests/cases.tsv`) and the digests of the images. Only `pass` counts as passing; a run with no pass, or with a waiver that no longer reproduces, fails. Existing reports keep their shape.
+- **`tests/known-bugs.tsv`** has a fifth column, the evidence URL of the waiver.
+
+---
+
 ## v0.2.0
 
 **Date:** 2026-10-14

@@ -5,6 +5,7 @@ adapters/*/bin/
 adapters/*/obj/
 adapters/*/__pycache__/
 reports/
+scripts/__pycache__/
 
 # Editors and OS
 .vscode/

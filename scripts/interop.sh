@@ -23,7 +23,8 @@
 # any library that consumes the images.
 #
 # Environment: REGISTRY, VERSION (image tag, default dev), VERBOSE=1,
-#              REPORT_DIR (keeps every result document when set).
+#              REPORT_DIR (keeps every result document when set, and writes
+#              results.json, interop-result-v1: only a pass counts as passing).
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,7 +39,10 @@ CASES="${ROOT}/tests/cases.tsv"
 KNOWN_BUGS="${ROOT}/tests/known-bugs.tsv"
 require_tools
 WORK=$(mktemp -d)
-trap 'rm -rf "${WORK}"; cleanup' EXIT
+STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+RESULT_LOG="${WORK}/results.log"
+REPRODUCE="REPORT_DIR=reports VERSION=${VERSION} scripts/interop.sh ${ADAPTERS[*]}"
+trap 'abort_results "${WORK}" "${STARTED}" "${REPRODUCE}"; rm -rf "${WORK}"; cleanup' EXIT
 network_up
 
 # ---- known upstream bugs that apply to the versions under test ----
@@ -49,7 +53,8 @@ for adapter in "${ADAPTERS[@]}"; do
     docker run --rm "$(image_of "${adapter}")" print-capabilities > "${WORK}/caps-${adapter}.json" 2>/dev/null
     version=$(jq -r '.upstream.version' "${WORK}/caps-${adapter}.json")
     log "${adapter}: upstream ${version}"
-    while IFS=$'\t' read -r bug_adapter bug_version bug_regex bug_text; do
+    printf '%s\t%s\t%s\n' "${adapter}" "${version}" "$(image_of "${adapter}")" >> "${WORK}/implementations.tsv"
+    while IFS=$'\t' read -r bug_adapter bug_version bug_regex bug_text _; do
         [[ -z "${bug_adapter}" || "${bug_adapter}" == \#* ]] && continue
         if [[ "${bug_adapter}" == "${adapter}" && "${bug_version}" == "${version}" ]]; then
             printf '%s\t%s\t%s\n' "${bug_adapter}" "${bug_regex}" "${bug_text}" >> "${WORK}/active"
@@ -79,7 +84,10 @@ supported() {
 }
 
 SKIPPED=0
-skip() { SKIPPED=$((SKIPPED + 1)); [[ -n "${VERBOSE:-}" ]] && log "skip: $*"; return 0; }
+skip() { SKIPPED=$((SKIPPED + 1)); record unsupported "$*"; [[ -n "${VERBOSE:-}" ]] && log "skip: $*"; return 0; }
+
+# at <stable id>: the scenario of the pairing ${client}, ${server}.
+at() { scenario "$1" "client=${client}" "server=${server}"; }
 
 # known_bug <client> <server> <operation>: prints the description of a known
 # bug that may affect this pairing and operation, if there is one.
@@ -98,6 +106,7 @@ known_bug() {
 hit_known_bug() {
     KNOWN=$((KNOWN + 1))
     echo "$3" >> "${WORK}/reproduced"
+    record known-difference "$3" "$3"
     [[ -n "${VERBOSE:-}" ]] && log "known bug: $1: $2"
     return 0
 }
@@ -119,13 +128,14 @@ keep() {  # keep <label> <document>
 
 log "adapters: ${ADAPTERS[*]} (${VERSION})"
 n=0
-while IFS=$'\t' read -r state want_exit want_summary needs operation; do
+while IFS=$'\t' read -r state want_exit want_summary needs operation id; do
     [[ -z "${state}" || "${state}" == \#* ]] && continue
     n=$((n + 1))
     reference="" reference_pair=""
     for server in "${ADAPTERS[@]}"; do
         for client in "${ADAPTERS[@]}"; do
             pair="${client}->${server}"
+            at "case.${id}"
             if ! supported "${client}" "${server}" "${needs}"; then
                 skip "${pair}: ${operation} (needs ${needs})"
                 continue
@@ -156,6 +166,7 @@ while IFS=$'\t' read -r state want_exit want_summary needs operation; do
             # A pairing a known bug may affect is not held to agreement.
             [[ -n "${bug}" ]] && continue
 
+            at "agree.${id}"
             normalized=$(jq -cS "${NORMALIZE}" <<<"${doc}")
             if [[ -z "${reference}" ]]; then
                 reference="${normalized}"; reference_pair="${pair}"
@@ -184,6 +195,7 @@ for server in "${ADAPTERS[@]}"; do
         has_role "${client}" client || continue
         pair="${client}->${server}"
         while read -r operation table base first count; do
+            at "values.${operation}.${base}-${first}-${count}"
             want=$(slice "${table}" "${first}" "${count}")
             got=$(read_values "${client}" "${name}" "${operation}" $((base + first)) "${count}")
             if [[ "${got}" == "${want}" ]]; then ok "${pair}: ${operation} ${count} at $((base + first)) matches the fixture"
@@ -214,21 +226,25 @@ for server in "${ADAPTERS[@]}"; do
         pair="${client}->${server}"
         name=$(start_server "${server}"); wait_ready "${name}" || exit 1
 
+        at values.fc06.visible
         run_client "${client}" write-single-register --address 200 --value 51966 --host "${name}" >/dev/null
         got=$(read_values "${client}" "${name}" read-holding-registers 199 3)
         want=$(jq -c '.holdingRegisters.values[199:202] | .[1] = 51966' "${FIXTURE}")
         if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC06 is visible to a later read, neighbours untouched"
         else fail "${pair}: read after FC06 returns ${got}, want ${want}"; fi
 
+        at values.fc16.visible-123
         run_client "${client}" write-multiple-registers --address 100 --values "$(csv "${regs123}")" --host "${name}" >/dev/null
         got=$(read_values "${client}" "${name}" read-holding-registers 100 123)
         if [[ "${got}" == "${regs123}" ]]; then ok "${pair}: FC16 with 123 registers is visible to a later read"
         else fail "${pair}: read after FC16 with 123 registers returns ${got:0:160}"; fi
+        at values.fc16.neighbours
         got=$(read_values "${client}" "${name}" read-holding-registers 98 2)
         want=$(slice holdingRegisters 98 2)
         if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC16 leaves the registers before it untouched"
         else fail "${pair}: registers before the FC16 range are ${got}, want ${want}"; fi
 
+        at values.fc05.visible
         run_client "${client}" write-single-coil --address 0 --value true --host "${name}" >/dev/null
         run_client "${client}" write-single-coil --address 1 --value false --host "${name}" >/dev/null
         got=$(read_values "${client}" "${name}" read-coils 0 3)
@@ -236,21 +252,25 @@ for server in "${ADAPTERS[@]}"; do
         if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC05 on and off are visible to a later read"
         else fail "${pair}: read after FC05 returns ${got}, want ${want}"; fi
 
+        at values.fc15.visible-1968
         run_client "${client}" write-multiple-coils --address 16 --values "$(csv "${bits1968}")" --host "${name}" >/dev/null
         got=$(read_values "${client}" "${name}" read-coils 16 1968)
         if [[ "${got}" == "${bits1968}" ]]; then ok "${pair}: FC15 with 1968 coils is visible to a later read"
         else fail "${pair}: read after FC15 with 1968 coils differs from what was written"; fi
+        at values.fc15.neighbours
         got=$(read_values "${client}" "${name}" read-coils 1984 16)
         want=$(slice coils 1984 16)
         if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC15 leaves the coils after it untouched"
         else fail "${pair}: coils after the FC15 range are ${got}, want ${want}"; fi
 
         # 13 coils: a count that is not a multiple of 8, at an address that is not one either.
+        at values.fc15.odd-address-13
         run_client "${client}" write-multiple-coils --address 3 --values 1,1,0,1,0,0,1,1,1,0,1,0,1 --host "${name}" >/dev/null
         got=$(read_values "${client}" "${name}" read-coils 3 13)
         if [[ "${got}" == "[true,true,false,true,false,false,true,true,true,false,true,false,true]" ]]; then ok "${pair}: FC15 with 13 coils at an odd address"
         else fail "${pair}: read after FC15 with 13 coils returns ${got}"; fi
 
+        at values.fc22.computes
         if supported "${client}" "${server}" "server:serverMaskWrite,client:clientMaskWrite"; then
             # Register 5 holds 4660 (0x1234): (0x1234 AND 0x00F2) OR (0x0025 AND NOT 0x00F2) = 0x0035.
             run_client "${client}" mask-write-register --address 5 --and-mask 0x00F2 --or-mask 0x0025 --host "${name}" >/dev/null
@@ -259,6 +279,7 @@ for server in "${ADAPTERS[@]}"; do
             else fail "${pair}: register after FC22 is ${got}, want [53]"; fi
         else skip "${pair}: FC22 value"; fi
 
+        at values.fc23.write-first
         if supported "${client}" "${server}" "server:serverReadWriteMultiple,client:clientReadWriteMultiple"; then
             # Write 31..32, read 30..33: the write comes first.
             got=$(run_client "${client}" read-write-multiple-registers --read-address 30 --read-quantity 4 \
@@ -267,22 +288,25 @@ for server in "${ADAPTERS[@]}"; do
             if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC23 writes before it reads"
             else fail "${pair}: FC23 returns ${got}, want ${want}"; fi
             # The largest FC23: 121 registers written, 125 read.
+            at values.fc23.largest
             got=$(run_client "${client}" read-write-multiple-registers --read-address 100 --read-quantity 125 \
                 --write-address 102 --values "$(csv "$(jq -c '.[0:121]' <<<"${regs123}")")" --host "${name}" | jq -c '.response.registers | length')
             if [[ "${got}" == 125 ]]; then ok "${pair}: FC23 with 121 written and 125 read"
             else fail "${pair}: FC23 with 121 written and 125 read returned ${got} registers"; fi
         else skip "${pair}: FC23 values"; fi
 
+        at values.server-events
         if has "${server}" requestEvents; then
             sleep 0.3
             events=$(docker logs "${name}" 2>/dev/null)
             for want in \
-                '.event == "request" and .function == 6 and .address == 200 and .quantity == 1 and .registers == [51966] and .exception == null' \
-                '.event == "request" and .function == 16 and .address == 100 and .quantity == 123 and (.registers | length) == 123 and .exception == null' \
-                '.event == "request" and .function == 15 and .address == 16 and .quantity == 1968 and (.bits | length) == 1968 and .exception == null' \
-                '.event == "request" and .function == 5 and .address == 1 and .bits == [false] and .exception == null' \
-                '.event == "request" and .function == 3 and .address == 100 and .quantity == 123 and .exception == null'
+                'fc06|.event == "request" and .function == 6 and .address == 200 and .quantity == 1 and .registers == [51966] and .exception == null' \
+                'fc16|.event == "request" and .function == 16 and .address == 100 and .quantity == 123 and (.registers | length) == 123 and .exception == null' \
+                'fc15|.event == "request" and .function == 15 and .address == 16 and .quantity == 1968 and (.bits | length) == 1968 and .exception == null' \
+                'fc05|.event == "request" and .function == 5 and .address == 1 and .bits == [false] and .exception == null' \
+                'fc03|.event == "request" and .function == 3 and .address == 100 and .quantity == 123 and .exception == null'
             do
+                at "values.server-events.${want%%|*}"; want="${want#*|}"
                 if jq -e -s "map(select(${want})) | length > 0" <<<"${events}" >/dev/null 2>&1; then ok "${pair}: server reports ${want:0:70}"
                 else fail "${pair}: no server event with ${want}"; fi
             done
@@ -300,18 +324,22 @@ for server in "${ADAPTERS[@]}"; do
         has_role "${client}" client || continue
         pair="${client}->${server}"
         name=$(shared_server "${server}")
+        at values.fc08.echo
         if supported "${client}" "${server}" "server:serverDiagnostics,client:clientDiagnostics"; then
             got=$(run_client "${client}" diagnostics --sub-function 0 --data c0de --host "${name}" | jq -c '.response')
             if [[ "${got}" == '{"function":8,"subFunction":0,"data":"c0de"}' ]]; then ok "${pair}: FC08 echoes Return Query Data"
             else fail "${pair}: FC08 Return Query Data returned ${got}"; fi
         else skip "${pair}: FC08 value"; fi
+        at values.fc17.server-id
         if supported "${client}" "${server}" "server:serverReportServerId,client:clientReportServerId"; then
             got=$(run_client "${client}" report-server-id --host "${name}" | jq -r '.response.data')
             if [[ "${got}" == "${server_id_hex}" ]]; then ok "${pair}: FC17 returns the fixture's server ID and run indicator"
             else fail "${pair}: FC17 returns ${got}, want ${server_id_hex}"; fi
         else skip "${pair}: FC17 value"; fi
+        at values.fc20
         if supported "${client}" "${server}" "server:serverFileRecord,client:clientReadFileRecord"; then
             while read -r file first count index; do
+                at "values.fc20.file-${file}-${first}-${count}"
                 got=$(run_client "${client}" read-file-record --file "${file}" --record "${first}" --length "${count}" --host "${name}" | jq -c '.response.registers')
                 want=$(jq -c --argjson f "${index}" --argjson i "${first}" --argjson n "${count}" '.fileRecords[$f].records[$i:$i+$n]' "${FIXTURE}")
                 if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC20 ${count} records of file ${file} from ${first} match the fixture"
@@ -322,8 +350,10 @@ for server in "${ADAPTERS[@]}"; do
 2 0 4 1
 FILES
         else skip "${pair}: FC20 values"; fi
+        at values.fc24
         if supported "${client}" "${server}" "server:serverFifoQueue,client:clientFifoQueue"; then
             for index in 0 1 2; do
+                at "values.fc24.queue-${index}"
                 address=$(jq -r --argjson q "${index}" '.fifoQueues[$q].address' "${FIXTURE}")
                 got=$(run_client "${client}" read-fifo-queue --address "${address}" --host "${name}" | jq -c '.response.registers')
                 want=$(jq -c --argjson q "${index}" '.fifoQueues[$q].values' "${FIXTURE}")
@@ -331,6 +361,7 @@ FILES
                 else fail "${pair}: FC24 queue at ${address}: ${got:0:160}, want ${want:0:160}"; fi
             done
         else skip "${pair}: FC24 values"; fi
+        at values.fc21.visible
         if supported "${client}" "${server}" "server:serverFileRecord,client:clientWriteFileRecord,client:clientReadFileRecord"; then
             name=$(start_server "${server}"); wait_ready "${name}" || exit 1
             run_client "${client}" write-file-record --file 1 --record 10 --values 7,8,9 --host "${name}" >/dev/null
@@ -339,6 +370,7 @@ FILES
             if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC21 is visible to a later FC20, neighbours untouched"
             else fail "${pair}: FC20 after FC21 returns ${got}, want ${want}"; fi
             if has "${server}" requestEvents; then
+                at values.fc21.server-event
                 sleep 0.3
                 if docker logs "${name}" 2>/dev/null | jq -e -s 'map(select(.event == "request" and .function == 21 and .exception == null)) | length > 0' >/dev/null 2>&1
                 then ok "${pair}: server reports the FC21 request"
@@ -358,6 +390,7 @@ for server in "${ADAPTERS[@]}"; do
         has_role "${client}" client || continue
         pair="${client}->${server}"
         repeat=()
+        at sessions.repeat-200
         if has "${client}" clientRepeat; then
             repeat=(--repeat 200)
             doc=$(run_client "${client}" read-holding-registers --address 0 --quantity 125 --repeat 200 --host "${name}")
@@ -366,6 +399,7 @@ for server in "${ADAPTERS[@]}"; do
             else fail "${pair}: 200 requests on one connection: $(jq -c '{ok, error, requests, responses}' <<<"${doc}" 2>/dev/null)"; fi
         else skip "${pair}: requests on one connection"; fi
 
+        at sessions.concurrent-8
         tmp=$(mktemp -d)
         for i in 1 2 3 4 5 6 7 8; do
             run_client "${client}" read-holding-registers --address 0 --quantity 125 ${repeat[@]+"${repeat[@]}"} --host "${name}" > "${tmp}/${i}.json" &
@@ -382,6 +416,7 @@ for server in "${ADAPTERS[@]}"; do
 done
 
 # ---- a known bug that no longer shows is a stale entry ----
+SCENARIO_ID=""
 while IFS=$'\t' read -r bug_adapter bug_regex bug_text; do
     if ! grep -qxF "${bug_text}" "${WORK}/reproduced"; then
         fail "known bug of ${bug_adapter} did not reproduce: ${bug_text}"
@@ -389,4 +424,5 @@ while IFS=$'\t' read -r bug_adapter bug_regex bug_text; do
     fi
 done < "${WORK}/active"
 
+write_results "${WORK}" "${STARTED}" "${REPRODUCE}"
 finish
