@@ -13,7 +13,7 @@ run-name: "Upstream check (${{ github.event_name }})"
 # A candidate is tested like a release: smoke test plus the cross-stack
 # self-test against the pinned other stacks. Bugs of a specific upstream
 # version listed in tests/known-bugs.tsv are reported as known rather than as
-# failures. Shared steps: https://github.com/otfabric/.github/tree/main/actions
+# failures. Shared steps: https://github.com/otfabric/.github/tree/main/actions.1.1
 on:
   schedule:
     - cron: "35 0 * * *"
@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: otfabric/.github/actions/upstream-images@v2.1.0
+      - uses: otfabric/.github/actions/upstream-images@v2.1.0.1.1
 
   candidate:
     name: ${{ matrix.adapter }}
@@ -63,7 +63,7 @@ jobs:
       - name: Build and self-test at the latest release
         id: test
         if: steps.resolve.outputs.update == 'yes'
-        uses: otfabric/.github/actions/upstream-candidate@v2.1.0
+        uses: otfabric/.github/actions/upstream-candidate@v2.1.0.1.1
         with:
           name: ${{ matrix.adapter }}
           pinned: ${{ steps.resolve.outputs.pin }}
@@ -85,7 +85,7 @@ jobs:
 
       - name: Table row
         if: always()
-        uses: otfabric/.github/actions/upstream-row@v2.1.0
+        uses: otfabric/.github/actions/upstream-row@v2.1.0.1.1
         with:
           component: ${{ matrix.adapter }}
           source: ${{ steps.resolve.outputs.source }}
@@ -107,7 +107,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: otfabric/.github/actions/upstream-report@v2.1.0
+      - uses: otfabric/.github/actions/upstream-report@v2.1.0.1.1
         with:
           needs: ${{ toJSON(needs) }}
           notes: |
