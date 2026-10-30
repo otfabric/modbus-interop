@@ -34,7 +34,7 @@ Adapter sources are MIT-licensed like the rest of the repository: keep the `SPDX
 
 The rule is the latest upstream release. A newer release that fails the self-tests is not adopted as the pin, but it is not dropped either: list its bug in [tests/known-bugs.tsv](tests/known-bugs.tsv), build it as a candidate (`make candidate-<adapter> CANDIDATE_VERSION=<version>`) and record in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) what the older pin costs. When the candidate run reports that the known bug no longer reproduces, move the pin.
 
-The **Upstream candidates** workflow does this probe every week for every stack and summarizes it as a decision table. When a pin is behind it opens an issue (or updates the open one) with that table, and closes it once every pin is the latest release again.
+The **Upstream** workflow (`.github/workflows/upstream.yml`) does this probe every day for every stack, and also checks whether the tag of every digest-pinned base image has moved. It summarizes both as a pin-vs-latest table. When a pin is behind it opens an issue (or updates the open one, with a comment when a new version shows up) with that table, and closes it once every pin is current again. A candidate is self-tested once per pin and latest version; later runs reuse that result.
 
 ## Registries and retries
 

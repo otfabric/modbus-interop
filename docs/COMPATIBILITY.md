@@ -15,9 +15,10 @@ capabilities come from `print-capabilities` of each image.
 | `nmodbus` | [NModbus](https://github.com/NModbus/NModbus) | 3.0.83 | 2026-04-16 | MIT | C# |
 | `tokiomodbus` | [tokio-modbus](https://github.com/slowtec/tokio-modbus) | 0.17.0 | 2025-10-22 | MIT OR Apache-2.0 | Rust |
 
-Every pin is the latest stable upstream release. The **Upstream candidates**
-workflow checks that every week (`scripts/latest-upstream.py`), tests a newer
-release as a candidate and opens an issue when a pin is behind.
+Every pin is the latest stable upstream release. The **Upstream** workflow
+checks that every day (`scripts/latest-upstream.py`, and the base-image
+digests), tests a newer release as a candidate and opens an issue when a pin
+is behind.
 
 Two adapters need at least their pinned release, because they use an API
 that is new in it: `digitalpetri` (raw request hooks, 2.1.6) and
