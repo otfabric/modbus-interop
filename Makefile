@@ -40,7 +40,7 @@ export REGISTRY VERSION
 
 # image-% and smoke-% are pattern rules, which make ignores for .PHONY
 # targets: they depend on FORCE instead.
-.PHONY: help all ci validate documents lint images smoke interop buildx publish \
+.PHONY: help all ci validate unittests documents lint images smoke interop buildx publish \
         buildx-setup publish-arch publish-manifest digests capabilities fixture clean FORCE
 FORCE:
 
@@ -58,7 +58,7 @@ ci: validate lint images documents ## Full local CI: validate, lint, build, smok
 fixture: ## Regenerate fixtures/baseline/fixture.json from scripts/gen-fixture.py
 	@python3 scripts/gen-fixture.py
 
-validate: ## Validate every fixture against the schema and the cross-field rules; check versions.yaml and RELEASE.md
+validate: unittests ## Validate every fixture against the schema and the cross-field rules; check versions.yaml and RELEASE.md
 	@scripts/check-versions.sh
 	@scripts/release-notes.sh > /dev/null && echo "ok   RELEASE.md has the notes of interop_version"
 	@python3 scripts/gen-fixture.py >/dev/null && git diff --quiet -- fixtures/baseline/fixture.json \
@@ -71,6 +71,9 @@ validate: ## Validate every fixture against the schema and the cross-field rules
 		$(RETRY) docker run --rm -v "$(CURDIR):/work:ro" -w /work $(TOOLS_REGISTRY)/library/python:3.12-slim \
 			sh -c 'pip install -q --root-user-action=ignore jsonschema && python scripts/validate-fixtures.py --require-schema'; \
 	fi
+
+unittests: ## Unit tests of the result scripts
+	@python3 -m unittest discover -q -s scripts -p 'test_*.py'
 
 documents: ## Run the self-tests keeping every document, and validate them against schemas/
 	@rm -rf reports && mkdir -p reports
