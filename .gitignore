@@ -11,3 +11,9 @@ scripts/__pycache__/
 .vscode/
 .idea/
 .DS_Store
+
+# Build artefacts live in /bin/ and /release/ (otfabric/engineering REPO-005)
+/bin/
+/release/
+*.test
+coverage.out
