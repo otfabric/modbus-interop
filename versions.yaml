@@ -3,7 +3,7 @@
 # The Dockerfiles are the source of truth for a build:
 # scripts/check-versions.sh fails when this file disagrees with them.
 
-interop_version: "0.3.0"
+interop_version: "0.3.1"
 contract_version: "1.1"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
 fixture_schema: "1.1"          # fixtures/schema/modbus-fixture.schema.json
 
