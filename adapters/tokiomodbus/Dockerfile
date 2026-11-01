@@ -14,7 +14,7 @@
 # Hub serves exactly the same images.
 ARG BASE_REGISTRY=docker.io/library
 ARG RUST_DIGEST=sha256:2752b332db73fdbb7dc576f06c82ed1f312005784ef913d7e04a28f5f55dc581
-ARG DEBIAN_DIGEST=sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+ARG DEBIAN_DIGEST=sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
 
 # ---------------------------------------------------------------------------
 # Stage 1: the adapter, with tokio-modbus and its dependencies linked in

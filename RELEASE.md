@@ -21,6 +21,17 @@ workflow and its own `modbus-interop-otfabric/<tag>` releases (`own/go-modbus/RE
 
 ---
 
+## v0.3.3
+
+**Date:** 2026-11-01
+**Previous release:** v0.3.2
+
+### Changed
+
+- New base image digests for `debian:trixie-slim`, `eclipse-temurin:25.0.4.1_1-jre-noble` and `python:3.14.8-slim-trixie`. The upstream versions of the references are unchanged.
+
+---
+
 ## v0.3.2
 
 **Date:** 2026-11-01

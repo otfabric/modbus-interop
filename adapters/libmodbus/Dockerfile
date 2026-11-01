@@ -13,7 +13,7 @@
 # Docker Hub serves exactly the same images (see the Makefile).
 ARG BASE_REGISTRY=docker.io/library
 # debian:trixie-slim, the multi-arch index (linux/amd64 and linux/arm64).
-ARG DEBIAN_DIGEST=sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+ARG DEBIAN_DIGEST=sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
 
 # The upstream release, as its git tag, and the commit that tag names.
 ARG UPSTREAM_VERSION=v3.2.0
