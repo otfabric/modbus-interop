@@ -18,8 +18,8 @@ ARG DEBIAN_DIGEST=sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46
 
 FROM ${BASE_REGISTRY}/golang:1.27.2-trixie@${GOLANG_DIGEST} AS build
 
-ARG UPSTREAM_VERSION=v1.10.3
-ARG UPSTREAM_SHA=6fa7c485f8934a8024f5a8c1edd1fb0cd192c496
+ARG UPSTREAM_VERSION=v1.10.4
+ARG UPSTREAM_SHA=5bdad2c0b093972750073e22cac210a7ac2047f2
 ARG ADAPTER_VERSION=dev
 ARG GOPROXY=https://proxy.golang.org
 
@@ -64,7 +64,7 @@ RUN set -eu; \
 FROM ${BASE_REGISTRY}/debian:trixie-slim@${DEBIAN_DIGEST} AS runtime
 
 ARG ADAPTER_VERSION=dev
-ARG UPSTREAM_VERSION=v1.10.3
+ARG UPSTREAM_VERSION=v1.10.4
 
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin interop \
     && mkdir -p /run/modbus-interop \

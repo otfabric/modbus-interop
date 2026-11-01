@@ -19,7 +19,7 @@ affected by their licences.
 
 | Component | Version | Licence | Source |
 |-----------|---------|---------|--------|
-| go-modbus | v1.10.3 | MIT | https://github.com/otfabric/go-modbus |
+| go-modbus | v1.10.4 | MIT | https://github.com/otfabric/go-modbus |
 | go-serial | v0.2.1 | MIT | https://github.com/otfabric/go-serial |
 | Go standard library | 1.27.2 | BSD-3-Clause | https://go.dev |
 
