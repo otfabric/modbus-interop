@@ -83,8 +83,7 @@ own_implementations:
     upstream: "go-modbus"
     repository: "https://github.com/otfabric/go-modbus"
     artifact: "go:github.com/otfabric/go-modbus"
-    version: "v1.10.4"
-    revision: "5bdad2c0b093972750073e22cac210a7ac2047f2"
+    version: "latest release, resolved when the image is built by hand"
     license: "MIT"
     language: "Go"
     independent_engine: false

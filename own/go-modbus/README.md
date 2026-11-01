@@ -26,14 +26,15 @@ docker run -d --name go-modbus -p 127.0.0.1:1502:1502 ghcr.io/otfabric/modbus-in
 until docker exec go-modbus test -f /run/modbus-interop/ready; do sleep 0.1; done
 ```
 
-`<tag>` is `<go-modbus version>-<commit>`, which never moves, or
-`<go-modbus version>`, the newest build of that release. There is no `latest`.
-Each publish is a [release](https://github.com/otfabric/modbus-interop/releases)
-named `modbus-interop-otfabric/<tag>` with the image digest. Pin the digest.
+`<tag>` is a go-modbus version such as `v1.10.5`, or `latest`, the newest one
+published. A rebuild of a version replaces its tag, so pin the digest if you need
+an exact build. The digest is in the summary of the
+[workflow run](https://github.com/otfabric/modbus-interop/actions/workflows/own-go-modbus.yml),
+and `docker run --rm <image> version` prints the versions.
 
 | | |
 |---|---|
-| Upstream | go-modbus, a released tag, pinned in `Dockerfile`, `go.mod` and `versions.yaml` |
+| Upstream | go-modbus, the latest release when the image was built |
 | Licence | MIT; every module's licence is in the image under `/licenses` |
 | Adapter name | `otfabric` (the name in documents, as the schema allows) |
 | Language | Go |
@@ -46,23 +47,20 @@ top-level `Makefile` knows a library under test, and CI enforces that. This
 directory and `.github/workflows/own-go-modbus.yml` are the one exception. The
 scripts take the image through `ADAPTER_IMAGE_otfabric`.
 
-The dependency runs one way, so no release loop can form
-(`otfabric/engineering` ADR-0012). This image builds a released go-modbus tag.
-No release or required check of go-modbus needs it, and go-modbus commits no pin
-of it. It is not in a harness release or `manifest.json`.
+No release loop can form (`otfabric/engineering` ADR-0012). This image is built
+by hand, from the latest go-modbus release, and nothing is committed: this
+repository has no pin of go-modbus to bump. No release or required check of
+go-modbus needs the image, and go-modbus commits no pin of it. It is not in a
+harness release or `manifest.json`.
 
-## Moving the pin
+## Publishing
 
-The workflow reports a newer go-modbus release in an issue each day. To move:
-
-1. In `Dockerfile`, both `ARG UPSTREAM_VERSION` lines and `ARG UPSTREAM_SHA` (the
-   commit of the tag).
-2. `go get github.com/otfabric/go-modbus@<version> && go mod tidy` here.
-3. `own_implementations` in `../../versions.yaml`.
-
-Merging publishes, after the smoke test and the cross-stack self-test against
-the latest released references have passed on both architectures. Run the
-workflow by hand to publish at once.
+Run the **Own stack (go-modbus)** workflow by hand, from `main`. It finds the
+latest go-modbus release and the latest harness release, and prints them. It
+builds the image, runs the smoke test and the cross-stack self-test on both
+architectures, then publishes `:<go-modbus version>` and `:latest`. Run from a
+branch, it stops before publishing. Nothing runs it automatically, so after a
+go-modbus release the image stays on the old version until someone does.
 
 ```sh
 make -f own/go-modbus/Makefile image smoke interop    # from the repository root

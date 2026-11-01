@@ -10,13 +10,17 @@ VERSION ?= $(shell git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -
 REFERENCES ?= libmodbus pymodbus digitalpetri nmodbus tokiomodbus
 BASE_REGISTRY ?= docker.io/library
 
+# The latest go-modbus release, as the workflow builds it.
+UPSTREAM_VERSION ?= $(shell git ls-remote --tags --refs https://github.com/otfabric/go-modbus.git 'v[0-9]*' | sed 's,.*refs/tags/,,' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -1)
+UPSTREAM_SHA ?= $(shell git ls-remote --tags https://github.com/otfabric/go-modbus.git 'refs/tags/$(UPSTREAM_VERSION)^{}' | cut -f1)
+
 export VERSION
 export ADAPTER_IMAGE_otfabric = $(IMAGE)
 
 .PHONY: image smoke interop
 
 image:
-	docker build --build-arg BASE_REGISTRY=$(BASE_REGISTRY) --tag $(IMAGE) --file own/go-modbus/Dockerfile .
+	docker build --build-arg BASE_REGISTRY=$(BASE_REGISTRY) --build-arg UPSTREAM_VERSION=$(UPSTREAM_VERSION) --build-arg UPSTREAM_SHA=$(UPSTREAM_SHA) --build-arg ADAPTER_VERSION=$(UPSTREAM_VERSION) --tag $(IMAGE) --file own/go-modbus/Dockerfile .
 
 smoke:
 	scripts/smoke.sh otfabric
