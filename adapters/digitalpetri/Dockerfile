@@ -13,7 +13,7 @@
 # Docker Hub serves exactly the same images.
 ARG BASE_REGISTRY=docker.io/library
 ARG MAVEN_DIGEST=sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976
-ARG JRE_DIGEST=sha256:d9a39a23634650173f1e2bbc176227af9728587ecf0f4b62d53e9355cd7a19ab
+ARG JRE_DIGEST=sha256:ce8543ddd3070ccbeaac2106a74c9387ddeb8d47a1c43348345715c1ef245c7f
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the adapter jar and collect its runtime class path

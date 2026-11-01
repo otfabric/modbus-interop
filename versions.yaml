@@ -3,7 +3,7 @@
 # The Dockerfiles are the source of truth for a build:
 # scripts/check-versions.sh fails when this file disagrees with them.
 
-interop_version: "0.3.2"
+interop_version: "0.3.3"
 contract_version: "1.1"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
 fixture_schema: "1.1"          # fixtures/schema/modbus-fixture.schema.json
 
@@ -97,7 +97,7 @@ base_images:
   # build arguments.
   debian:
     image: "docker.io/library/debian:trixie-slim"
-    digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
+    digest: "sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4"
     used_by: [libmodbus, tokiomodbus, otfabric]
   golang:
     image: "docker.io/library/golang:1.27.2-trixie"
@@ -105,7 +105,7 @@ base_images:
     used_by: [otfabric]
   python:
     image: "docker.io/library/python:3.14.8-slim-trixie"
-    digest: "sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170"
+    digest: "sha256:fbecd461fc72d21b2143c6eaba25143738079154a6d0ea3da3aec724f50eed4a"
     used_by: [pymodbus]
   maven:
     image: "docker.io/library/maven:3.9.16-eclipse-temurin-25-noble"
@@ -113,7 +113,7 @@ base_images:
     used_by: [digitalpetri]
   jre:
     image: "docker.io/library/eclipse-temurin:25.0.4.1_1-jre-noble"
-    digest: "sha256:d9a39a23634650173f1e2bbc176227af9728587ecf0f4b62d53e9355cd7a19ab"
+    digest: "sha256:ce8543ddd3070ccbeaac2106a74c9387ddeb8d47a1c43348345715c1ef245c7f"
     used_by: [digitalpetri]
   dotnet_sdk:
     image: "mcr.microsoft.com/dotnet/sdk:10.0.401-noble"
