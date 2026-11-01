@@ -93,6 +93,13 @@ print-fixture        the fixture baked into the image
 [interop-result-v1](schemas/interop-result-v1.schema.json). Only `pass` counts as passing: a run with
 no pass, or with a known bug that no longer reproduces, fails.
 
+## OT Fabric's own stack
+
+`ghcr.io/otfabric/otfabric-go-modbus` is go-modbus behind the same contract, so
+you can test your stack against ours the way we test ours against yours. It is
+not an independent implementation and not part of a release of this repository:
+see [own/go-modbus/README.md](own/go-modbus/README.md).
+
 ## Using the images from a library's tests
 
 A consumer needs Docker, the image references and its own test code. It does

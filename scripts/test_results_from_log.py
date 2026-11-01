@@ -38,6 +38,10 @@ def convert(log, active=(), reproduced=()):
 
 
 class Convert(unittest.TestCase):
+    def test_a_stack_without_an_independent_engine_is_recorded_as_such(self):
+        got = rl.implementations(["a\t1\timage-a\ttrue", "b\t2\timage-b\tfalse", "c\t3\timage-c"], {}, digest=lambda _: None)
+        self.assertEqual([i["independent"] for i in got], [True, False, True])
+
     def test_a_pass_is_valid_and_passes(self):
         doc = convert([line("case.read.one", "pass")])
         self.assertEqual(interop_result.schema_errors(doc), [])
