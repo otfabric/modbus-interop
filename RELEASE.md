@@ -16,6 +16,9 @@ one section per version, newest first, each ending with a `---` line, and no
 
 Tags are immutable. A fix is a new version.
 
+The `otfabric-go-modbus` image is not part of these releases. It has its own
+workflow and its own `otfabric-go-modbus/<tag>` releases (`own/go-modbus/README.md`).
+
 ---
 
 ## v0.3.2

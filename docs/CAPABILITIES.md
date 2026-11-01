@@ -37,7 +37,7 @@ One JSON object on one line ([schema](../schemas/capabilities.schema.json)):
 | `adapter` | Adapter name; the image is `modbus-interop-<adapter>` |
 | `adapterVersion` | Release of this repository the image was built from (`dev` for a local build) |
 | `upstream` | The implementation inside: name, exact version and revision, licence, language |
-| `upstream.independentEngine` | `false` when the adapter wraps the protocol engine of another adapter. Results from such an adapter do not count as an additional independent implementation |
+| `upstream.independentEngine` | `false` when the adapter wraps the protocol engine of another adapter, or is OT Fabric's own stack (`own/`). Results from such an adapter do not count as an additional independent implementation |
 | `roles` | Which of `server` and `client` the image provides |
 | `features` | See below; every value is a boolean |
 | `serverFunctions` | Function codes the server answers with something other than exception 1 |

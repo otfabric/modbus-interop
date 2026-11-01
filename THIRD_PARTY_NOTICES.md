@@ -15,6 +15,14 @@ Nothing in this repository is linked into a consumer: a library that tests
 against the images talks to them over TCP and reads their output, and is not
 affected by their licences.
 
+## Image `otfabric-go-modbus`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| go-modbus | v1.10.3 | MIT | https://github.com/otfabric/go-modbus |
+| go-serial | v0.2.1 | MIT | https://github.com/otfabric/go-serial |
+| Go standard library | 1.27.2 | BSD-3-Clause | https://go.dev |
+
 ## Image `modbus-interop-libmodbus`
 
 | Component | Version | Licence | Source |

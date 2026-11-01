@@ -76,13 +76,33 @@ implementations:
     independent_engine: true
     roles: [server, client]
 
+# OT Fabric's own stacks. Not independent implementations, not in a release of
+# this repository or its manifest.json: see own/<library>/README.md.
+own_implementations:
+  otfabric:
+    upstream: "go-modbus"
+    repository: "https://github.com/otfabric/go-modbus"
+    artifact: "go:github.com/otfabric/go-modbus"
+    version: "v1.10.3"
+    revision: "6fa7c485f8934a8024f5a8c1edd1fb0cd192c496"
+    license: "MIT"
+    language: "Go"
+    independent_engine: false
+    roles: [server, client]
+    image: "ghcr.io/otfabric/otfabric-go-modbus"
+    build: "own/go-modbus"
+
 base_images:
   # Multi-arch index digests. Each adapter Dockerfile names them as *_DIGEST
   # build arguments.
   debian:
     image: "docker.io/library/debian:trixie-slim"
     digest: "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
-    used_by: [libmodbus, tokiomodbus]
+    used_by: [libmodbus, tokiomodbus, otfabric]
+  golang:
+    image: "docker.io/library/golang:1.27.2-trixie"
+    digest: "sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d"
+    used_by: [otfabric]
   python:
     image: "docker.io/library/python:3.14.8-slim-trixie"
     digest: "sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170"

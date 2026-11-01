@@ -55,7 +55,12 @@ abort_results() {
     write_results "$@"
 }
 
-image_of() { echo "${REGISTRY}/modbus-interop-$1:${VERSION}"; }
+# image_of <adapter>: ADAPTER_IMAGE_<adapter> names an image outside the release
+# set, which this repository's scripts know nothing about.
+image_of() {
+    local override="ADAPTER_IMAGE_$1"
+    if [[ -n "${!override:-}" ]]; then echo "${!override}"; else echo "${REGISTRY}/modbus-interop-$1:${VERSION}"; fi
+}
 
 require_tools() {
     local t

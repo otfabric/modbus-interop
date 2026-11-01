@@ -79,8 +79,8 @@ def parse_result(line, waivers):
 def implementations(rows, versions, digest=interop_result.repo_digest):
     out = []
     for row in rows:
-        name, version, image = row.split("\t")
-        i = {"name": name, "version": version, "independent": True}
+        name, version, image, *engine = row.split("\t")
+        i = {"name": name, "version": version, "independent": engine != ["false"]}
         i.update(versions.get(name, {}))
         pinned = digest(image)
         if pinned:
