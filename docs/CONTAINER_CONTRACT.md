@@ -35,7 +35,7 @@ What a *device* answers to a request is defined by its fixture: see
 
 | Item | Value |
 |------|-------|
-| Image | `ghcr.io/otfabric/modbus-interop-<adapter>`; OT Fabric's own stacks `ghcr.io/otfabric/otfabric-go-<protocol>` |
+| Image | `ghcr.io/otfabric/modbus-interop-<adapter>`; OT Fabric's own stack is the adapter `otfabric` |
 | Entrypoint | `modbus-interop` (`/usr/local/bin/modbus-interop`) |
 | Default command | `server` |
 | Protocol | Modbus TCP (MBAP) |

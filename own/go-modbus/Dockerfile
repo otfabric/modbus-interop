@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# otfabric-go-modbus: OT Fabric's own Modbus stack behind the container contract.
+# modbus-interop-otfabric: OT Fabric's own Modbus stack behind the container contract.
 # Not an independent implementation: see README.md.
 #
 # Build from the repository root:
@@ -75,7 +75,7 @@ COPY --from=build /out/licenses /licenses
 COPY LICENSE /licenses/modbus-interop/LICENSE
 COPY fixtures /fixtures
 
-LABEL org.opencontainers.image.title="otfabric-go-modbus" \
+LABEL org.opencontainers.image.title="modbus-interop-otfabric" \
       org.opencontainers.image.description="OT Fabric go-modbus behind the modbus-interop container contract, for testing. Not an independent implementation." \
       org.opencontainers.image.source="https://github.com/otfabric/modbus-interop" \
       org.opencontainers.image.licenses="MIT" \

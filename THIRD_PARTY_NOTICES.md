@@ -15,7 +15,7 @@ Nothing in this repository is linked into a consumer: a library that tests
 against the images talks to them over TCP and reads their output, and is not
 affected by their licences.
 
-## Image `otfabric-go-modbus`
+## Image `modbus-interop-otfabric`
 
 | Component | Version | Licence | Source |
 |-----------|---------|---------|--------|

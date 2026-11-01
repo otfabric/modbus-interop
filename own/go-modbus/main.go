@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// Command modbus-interop is the otfabric-go-modbus image: go-modbus behind the
+// Command modbus-interop is the modbus-interop-otfabric image: go-modbus behind the
 // container contract (docs/CONTAINER_CONTRACT.md).
 //
 // It is OT Fabric's own stack, not an independent implementation: results

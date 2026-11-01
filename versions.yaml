@@ -89,7 +89,7 @@ own_implementations:
     language: "Go"
     independent_engine: false
     roles: [server, client]
-    image: "ghcr.io/otfabric/otfabric-go-modbus"
+    image: "ghcr.io/otfabric/modbus-interop-otfabric"
     build: "own/go-modbus"
 
 base_images:

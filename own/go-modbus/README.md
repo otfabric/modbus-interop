@@ -1,9 +1,11 @@
-# otfabric-go-modbus
+# modbus-interop-otfabric
 
 [go-modbus](https://github.com/otfabric/go-modbus), OT Fabric's own Modbus
 stack, behind the [container contract](../../docs/CONTAINER_CONTRACT.md), so
 that other stacks can test against it. Anything that uses a
-`modbus-interop-<adapter>` image can use this one in its place.
+`modbus-interop-<adapter>` image can use this one in its place. Unlike those, it
+is not a reference: its tags are go-modbus versions, and no harness release or
+`manifest.json` contains it.
 
 **For testing only.** It runs an unauthenticated Modbus server. Do not expose it
 to a network you do not control. Old images stay available, so check
@@ -20,14 +22,14 @@ about it.
 ## Use
 
 ```sh
-docker run -d --name go-modbus -p 127.0.0.1:1502:1502 ghcr.io/otfabric/otfabric-go-modbus:<tag> server
+docker run -d --name go-modbus -p 127.0.0.1:1502:1502 ghcr.io/otfabric/modbus-interop-otfabric:<tag> server
 until docker exec go-modbus test -f /run/modbus-interop/ready; do sleep 0.1; done
 ```
 
 `<tag>` is `<go-modbus version>-<commit>`, which never moves, or
 `<go-modbus version>`, the newest build of that release. There is no `latest`.
 Each publish is a [release](https://github.com/otfabric/modbus-interop/releases)
-named `otfabric-go-modbus/<tag>` with the image digest. Pin the digest.
+named `modbus-interop-otfabric/<tag>` with the image digest. Pin the digest.
 
 | | |
 |---|---|
