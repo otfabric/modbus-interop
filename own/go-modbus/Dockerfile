@@ -6,9 +6,10 @@
 # Build from the repository root:
 #   make -f own/go-modbus/Makefile image
 #
-# go.mod pins go-modbus and go.sum every module. The pin is UPSTREAM_VERSION
-# below (the released git tag, which is the Go module version) and UPSTREAM_SHA
-# (its commit), mirrored in go.mod and versions.yaml. A build never uses main.
+# The build takes the go-modbus release as UPSTREAM_VERSION (the released git tag,
+# which is the Go module version) and its commit as UPSTREAM_SHA. There is no pin
+# in this repository: the workflow passes the latest release. A build never uses
+# main. go.mod and go.sum here are only a starting point for local work.
 
 ARG BASE_REGISTRY=docker.io/library
 # golang:1.27.2-trixie and debian:trixie-slim, multi-arch indexes
@@ -18,19 +19,22 @@ ARG DEBIAN_DIGEST=sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24
 
 FROM ${BASE_REGISTRY}/golang:1.27.2-trixie@${GOLANG_DIGEST} AS build
 
-ARG UPSTREAM_VERSION=v1.10.4
-ARG UPSTREAM_SHA=5bdad2c0b093972750073e22cac210a7ac2047f2
+ARG UPSTREAM_VERSION
+ARG UPSTREAM_SHA
 ARG ADAPTER_VERSION=dev
 ARG GOPROXY=https://proxy.golang.org
 
-ENV CGO_ENABLED=0 GOPROXY=${GOPROXY} GOSUMDB=sum.golang.org GOFLAGS=-mod=readonly GOTOOLCHAIN=local
+ENV CGO_ENABLED=0 GOPROXY=${GOPROXY} GOSUMDB=sum.golang.org GOTOOLCHAIN=local
 WORKDIR /src
-COPY own/go-modbus/go.mod own/go-modbus/go.sum ./
+COPY own/go-modbus/go.mod own/go-modbus/go.sum own/go-modbus/*.go ./
 
 RUN set -eu; \
+    test -n "${UPSTREAM_VERSION}" || { echo "UPSTREAM_VERSION is required" >&2; exit 1; }; \
     echo "${UPSTREAM_SHA}" | grep -Eq '^[0-9a-f]{40}$'; \
-    pinned="$(go list -m -f '{{.Version}}' github.com/otfabric/go-modbus)"; \
-    test "${pinned}" = "${UPSTREAM_VERSION}" || { echo "go.mod has go-modbus ${pinned}, want ${UPSTREAM_VERSION}" >&2; exit 1; }; \
+    go get "github.com/otfabric/go-modbus@${UPSTREAM_VERSION}"; \
+    go mod tidy; \
+    built="$(go list -m -f '{{.Version}}' github.com/otfabric/go-modbus)"; \
+    test "${built}" = "${UPSTREAM_VERSION}" || { echo "go.mod has go-modbus ${built}, want ${UPSTREAM_VERSION}" >&2; exit 1; }; \
     go mod download && go mod verify; \
     origin="$(go mod download -json "github.com/otfabric/go-modbus@${UPSTREAM_VERSION}" \
         | sed -nE 's/^[[:space:]]*"Hash": "([0-9a-f]{40})".*/\1/p')"; \
@@ -38,7 +42,6 @@ RUN set -eu; \
         echo "go-modbus ${UPSTREAM_VERSION} is commit ${origin}, not ${UPSTREAM_SHA}" >&2; exit 1; \
     fi
 
-COPY own/go-modbus/*.go ./
 RUN set -eu; \
     test -z "$(gofmt -l .)"; \
     go vet ./...; \
@@ -64,7 +67,7 @@ RUN set -eu; \
 FROM ${BASE_REGISTRY}/debian:trixie-slim@${DEBIAN_DIGEST} AS runtime
 
 ARG ADAPTER_VERSION=dev
-ARG UPSTREAM_VERSION=v1.10.4
+ARG UPSTREAM_VERSION
 
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin interop \
     && mkdir -p /run/modbus-interop \

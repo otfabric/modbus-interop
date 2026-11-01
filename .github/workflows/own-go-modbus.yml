@@ -1,38 +1,21 @@
 name: Own stack (go-modbus)
-run-name: "Own stack go-modbus (${{ github.event_name }}) on ${{ github.ref_name }}"
+run-name: "Build modbus-interop-otfabric from the latest go-modbus, by @${{ github.actor }} on ${{ github.ref_name }}"
 
-# Publishes ghcr.io/otfabric/modbus-interop-otfabric: OT Fabric's own stack behind the
-# container contract, so that others can test against it (own/go-modbus/README.md).
+# Manual only. Builds ghcr.io/otfabric/modbus-interop-otfabric from the latest
+# go-modbus release, tests it against the latest released references and, when
+# run from main, publishes it as :<go-modbus version> and :latest.
 #
-# It stands apart from everything else in this repository on purpose, and so
-# that no release loop can form:
-# - It builds a released go-modbus tag, never main, and go-modbus depends on
-#   nothing here: no release or required check of go-modbus needs this image.
-# - The Release workflow, manifest.json and the Makefile's ADAPTERS do not
-#   contain it, so a broken go-modbus cannot hold up a release of the harness.
-# - A failure here blocks only this image.
-#
-# Daily, it reports a go-modbus release newer than the pin in an issue. A bump is
-# a reviewed change; merging it publishes. Run it by hand to publish at once.
+# Nothing is committed, and nothing else waits for this: no pin to bump, no
+# release, no schedule. So no release loop can form (own/go-modbus/README.md).
+# The harness Release workflow and manifest.json do not contain this image.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "own/go-modbus/**"
-      - ".github/workflows/own-go-modbus.yml"
-  pull_request:
-    paths:
-      - "own/go-modbus/**"
-      - ".github/workflows/own-go-modbus.yml"
-  schedule:
-    - cron: "50 0 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: own-go-modbus-${{ github.ref }}
+  group: own-go-modbus
   cancel-in-progress: false
 
 env:
@@ -40,67 +23,50 @@ env:
   BASE_REGISTRY: mirror.gcr.io/library
 
 jobs:
-  drift:
-    name: Pin against the latest go-modbus
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - name: Report a newer release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          pin=$(sed -nE 's/^ARG UPSTREAM_VERSION=(.+)$/\1/p' own/go-modbus/Dockerfile | head -1)
-          latest=$(git ls-remote --tags --refs https://github.com/otfabric/go-modbus.git 'v[0-9]*' \
-            | sed 's,.*refs/tags/,,' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          echo "pin ${pin}, latest ${latest}" | tee -a "$GITHUB_STEP_SUMMARY"
-          title="modbus-interop-otfabric: go-modbus release behind the pin"
-          open=$(gh issue list --state open --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')
-          if [ "${pin}" = "${latest}" ]; then
-            [ -z "${open}" ] || gh issue close "${open}" --comment "The pin is ${pin}, the latest release."
-            exit 0
-          fi
-          body="go-modbus ${latest} is out and the image is on ${pin}. Move the pin as own/go-modbus/README.md describes; merging publishes the image."
-          if [ -n "${open}" ]; then gh issue edit "${open}" --body "${body}"; else gh issue create --title "${title}" --body "${body}"; fi
-
   version:
-    name: Resolve version
-    if: github.event_name != 'schedule'
+    name: Resolve versions
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       upstream: ${{ steps.version.outputs.upstream }}
-      tag: ${{ steps.version.outputs.tag }}
+      revision: ${{ steps.version.outputs.revision }}
       harness: ${{ steps.version.outputs.harness }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: version
-        name: The pin, the image tag and the harness release to test against
+        name: The latest go-modbus, and the harness release to test against
         env:
           SHA: ${{ github.sha }}
+          REF: ${{ github.ref_name }}
         run: |
-          upstream=$(sed -nE 's/^ARG UPSTREAM_VERSION=(.+)$/\1/p' own/go-modbus/Dockerfile | head -1)
-          revision=$(sed -nE 's/^ARG UPSTREAM_SHA=(.+)$/\1/p' own/go-modbus/Dockerfile | head -1)
-          for want in "${upstream}" "${revision}"; do
-            sed -n '/^own_implementations:/,/^[a-z]/p' versions.yaml | grep -qF "${want}" \
-              || { echo "::error::${want} is not under own_implementations in versions.yaml"; exit 1; }
-          done
-          grep -qF "github.com/otfabric/go-modbus ${upstream}" own/go-modbus/go.mod \
-            || { echo "::error::own/go-modbus/go.mod is not on ${upstream}"; exit 1; }
-          git ls-remote --tags https://github.com/otfabric/go-modbus.git "refs/tags/${upstream}^{}" | grep -q "^${revision}" \
-            || { echo "::error::go-modbus ${upstream} is not commit ${revision}"; exit 1; }
+          upstream=$(git ls-remote --tags --refs https://github.com/otfabric/go-modbus.git 'v[0-9]*' \
+            | sed 's,.*refs/tags/,,' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          [ -n "${upstream}" ] || { echo "::error::no go-modbus release found"; exit 1; }
+          # An annotated tag has a peeled line, with the commit.
+          revision=$(git ls-remote --tags https://github.com/otfabric/go-modbus.git "refs/tags/${upstream}^{}" | cut -f1)
+          [ -n "${revision}" ] || revision=$(git ls-remote --tags https://github.com/otfabric/go-modbus.git "refs/tags/${upstream}" | cut -f1)
           harness=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
+          [ -n "${harness}" ] || { echo "::error::no harness release found"; exit 1; }
+          if [ "${REF}" = "main" ]; then publish="yes: ${IMAGE}:${upstream} and ${IMAGE}:latest"; else publish="no: not run from main"; fi
           {
             echo "upstream=${upstream}"
-            echo "tag=${upstream}-${SHA:0:7}"
+            echo "revision=${revision}"
             echo "harness=${harness}"
           } >> "$GITHUB_OUTPUT"
+          {
+            echo "## Versions"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| go-modbus (latest release) | \`${upstream}\` |"
+            echo "| go-modbus commit | \`${revision}\` |"
+            echo "| Image tag | \`${upstream}\` |"
+            echo "| Reference images (latest harness release) | \`${harness}\` |"
+            echo "| This repository | \`${REF}\` at \`${SHA}\` |"
+            echo "| Publish | ${publish} |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build, test (${{ matrix.arch }})
@@ -120,7 +86,8 @@ jobs:
             runner: ubuntu-24.04-arm
     env:
       VERSION: ${{ needs.version.outputs.harness }}
-      TAG: ${{ needs.version.outputs.tag }}
+      UPSTREAM: ${{ needs.version.outputs.upstream }}
+      REVISION: ${{ needs.version.outputs.revision }}
       ADAPTER_IMAGE_otfabric: ghcr.io/otfabric/modbus-interop-otfabric:ci
     steps:
       - uses: actions/checkout@v7
@@ -129,23 +96,39 @@ jobs:
           python-version: "3.12"
       - run: pip install jsonschema
 
-      - name: Build
+      - name: Build from go-modbus ${{ needs.version.outputs.upstream }}
         run: |
-          scripts/retry.sh docker build --build-arg BASE_REGISTRY="${BASE_REGISTRY}" --build-arg ADAPTER_VERSION="${TAG}" \
+          scripts/retry.sh docker build --progress=plain --build-arg BASE_REGISTRY="${BASE_REGISTRY}" \
+            --build-arg UPSTREAM_VERSION="${UPSTREAM}" --build-arg UPSTREAM_SHA="${REVISION}" \
+            --build-arg ADAPTER_VERSION="${UPSTREAM}" \
             --tag "${ADAPTER_IMAGE_otfabric}" --file own/go-modbus/Dockerfile .
 
-      - name: Pull the released reference images
+      - name: What was built
+        run: |
+          reported=$(docker run --rm "${ADAPTER_IMAGE_otfabric}" print-capabilities | jq -r '.upstream.version')
+          {
+            echo "## ${{ matrix.arch }}"
+            echo
+            echo "- \`$(docker run --rm "${ADAPTER_IMAGE_otfabric}" version)\`"
+            docker run --rm "${ADAPTER_IMAGE_otfabric}" print-capabilities | jq -r '"- upstream \(.upstream.name) \(.upstream.version), commit `\(.upstream.revision)`, independent engine: \(.upstream.independentEngine)"'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "${reported}" = "${UPSTREAM}" ] || { echo "::error::the image reports go-modbus ${reported}, want ${UPSTREAM}"; exit 1; }
+
+      - name: Pull the reference images of ${{ needs.version.outputs.harness }}
         run: |
           for a in libmodbus pymodbus digitalpetri nmodbus tokiomodbus; do
             scripts/retry.sh docker pull --quiet "ghcr.io/otfabric/modbus-interop-${a}:${VERSION}"
+            docker run --rm "ghcr.io/otfabric/modbus-interop-${a}:${VERSION}" print-capabilities \
+              | jq -r --arg image "${a}:${VERSION}" '"- \($image): \(.upstream.name) \(.upstream.version)"' | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
       - name: Smoke, cross-stack self-test against the references, document schemas
         run: |
           mkdir -p reports
           REPORT_DIR=reports scripts/smoke.sh otfabric
-          REPORT_DIR=reports scripts/interop.sh otfabric libmodbus pymodbus digitalpetri nmodbus tokiomodbus
+          REPORT_DIR=reports scripts/interop.sh otfabric libmodbus pymodbus digitalpetri nmodbus tokiomodbus 2>&1 | tee reports/interop.log
           python3 scripts/validate-documents.py reports
+          grep -E '^\[(smoke|interop)\]' reports/interop.log | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       - name: Upload documents
         if: always()
@@ -155,30 +138,28 @@ jobs:
           path: reports/
           if-no-files-found: ignore
 
-      - name: Push the tested image as <tag>-<arch>
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+      - name: Push the tested image as <version>-<arch>
+        if: github.ref == 'refs/heads/main'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARCH: ${{ matrix.arch }}
           ACTOR: ${{ github.actor }}
         run: |
           printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${ACTOR}" --password-stdin
-          docker tag "${ADAPTER_IMAGE_otfabric}" "${IMAGE}:${TAG}-${ARCH}"
-          scripts/retry.sh docker push --quiet "${IMAGE}:${TAG}-${ARCH}"
+          docker tag "${ADAPTER_IMAGE_otfabric}" "${IMAGE}:${UPSTREAM}-${ARCH}"
+          scripts/retry.sh docker push --quiet "${IMAGE}:${UPSTREAM}-${ARCH}"
 
   publish:
-    name: Multi-arch image and release
+    name: Publish ${{ needs.version.outputs.upstream }} and latest
     needs: [version, build]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
       packages: write
     env:
       UPSTREAM: ${{ needs.version.outputs.upstream }}
-      TAG: ${{ needs.version.outputs.tag }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
       - name: Join the architectures
@@ -187,21 +168,13 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: |
           printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${ACTOR}" --password-stdin
-          # <tag> never moves. <upstream> is the newest build of that go-modbus release.
-          scripts/retry.sh docker buildx imagetools create --tag "${IMAGE}:${TAG}" --tag "${IMAGE}:${UPSTREAM}" \
-            "${IMAGE}:${TAG}-amd64" "${IMAGE}:${TAG}-arm64"
-      - name: GitHub release, never the latest one of this repository
-        env:
-          SHA: ${{ github.sha }}
-        run: |
-          digest=$(scripts/retry.sh docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{.Manifest.Digest}}')
-          cat > notes.md <<NOTES
-          go-modbus ${UPSTREAM} behind the container contract, for testing.
-
-          \`${IMAGE}@${digest}\`
-
-          This is OT Fabric's own stack, not an independent implementation: a result against it is not independent evidence for go-modbus.
-          NOTES
-          gh release create "modbus-interop-otfabric/${TAG}" --target "${SHA}" --latest=false \
-            --title "modbus-interop-otfabric ${TAG}" --notes-file notes.md
-          echo "${IMAGE}@${digest}" | tee -a "$GITHUB_STEP_SUMMARY"
+          scripts/retry.sh docker buildx imagetools create --tag "${IMAGE}:${UPSTREAM}" --tag "${IMAGE}:latest" \
+            "${IMAGE}:${UPSTREAM}-amd64" "${IMAGE}:${UPSTREAM}-arm64"
+          digest=$(scripts/retry.sh docker buildx imagetools inspect "${IMAGE}:${UPSTREAM}" --format '{{.Manifest.Digest}}')
+          {
+            echo "## Published"
+            echo
+            echo "- \`${IMAGE}:${UPSTREAM}\`"
+            echo "- \`${IMAGE}:latest\`"
+            echo "- \`${IMAGE}@${digest}\`"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
