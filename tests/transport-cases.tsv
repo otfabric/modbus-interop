@@ -1,0 +1,35 @@
+# Transport cases for scripts/interop.sh (contract 1.2, --transport), against
+# the baseline fixture.
+#
+# Columns, separated by tabs:
+#   1  transports  comma-separated values of --transport the case runs on
+#   2..7           as in tests/cases.tsv: state, exit, summary, needs,
+#                  operation and flags, stable ID
+#
+# A case runs for every client/server pairing that lists the transport in
+# "transports" of its capabilities (client: transports.client, server:
+# transports.server), with the server started with --transport and the
+# client given the same --transport. Its result IDs are
+# transport.<transport>.case.<id> and transport.<transport>.agree.<id>.
+# All pairings of one transport must return the same result document.
+#
+# On rtu-over-tcp a request for another unit identifier is not answered
+# (docs/CONTAINER_CONTRACT.md, Transports): the client times out.
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=1 n=2000	-	read-coils --address 0 --quantity 2000	read-coils.address-0.quantity-2000
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=2 n=2000	-	read-discrete-inputs --address 1000 --quantity 2000	read-discrete-inputs.address-1000.quantity-2000
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=3 n=125	-	read-holding-registers --address 131 --quantity 125	read-holding-registers.address-131.quantity-125
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=4 n=125	server:serverHighestAddress	read-input-registers --address 65411 --quantity 125	read-input-registers.address-65411.quantity-125
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=4 n=1	server:serverHighestAddress	read-input-registers --address 65535 --quantity 1	read-input-registers.address-65535.quantity-1
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-coils --address 1999 --quantity 2	read-coils.address-1999.quantity-2
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-holding-registers --address 256 --quantity 1	read-holding-registers.address-256.quantity-1
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-input-registers --address 0 --quantity 1	read-input-registers.address-0.quantity-1
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=2 fc=- n=0	-	write-single-register --address 256 --value 1	write-single-register.address-256.value-1
+udp,rtu-over-tcp	rw	1	ok=false error=exception exc=2 fc=- n=0	-	write-multiple-coils --address 1998 --values 1,0,1	write-multiple-coils.address-1998.values-1-0-1
+udp	ro	1	ok=false error=exception exc=11 fc=- n=0	server:serverUnitIdFiltering	read-holding-registers --address 0 --quantity 1 --unit-id 2	read-holding-registers.address-0.quantity-1.unit-id-2
+rtu-over-tcp	ro	1	ok=false error=timeout exc=- fc=- n=0	-	read-holding-registers --address 0 --quantity 1 --unit-id 2 --timeout-ms 1500	read-holding-registers.address-0.quantity-1.unit-id-2.no-answer
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=3 n=10	client:clientRepeat	read-holding-registers --address 0 --quantity 10 --repeat 50	read-holding-registers.address-0.quantity-10.repeat-50
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=3 fc=- n=0	client:clientRaw,server:serverQuantityCheck	raw --function 3 --data 0000007e	raw.function-3.data-0000007e
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=1 fc=- n=0	client:clientRaw,server:serverIllegalFunction	raw --function 65 --data 0102	raw.function-65.data-0102
+udp,rtu-over-tcp	ro	1	ok=false error=exception exc=2 fc=- n=0	server:serverReadWriteMultiple,client:clientReadWriteMultiple	read-write-multiple-registers --read-address 250 --read-quantity 10 --write-address 40 --values 7,8	read-write-multiple-registers.read-address-250.read-quantity-10.write-address-40.values-7-8
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=17 n=0	server:serverReportServerId,client:clientReportServerId	report-server-id	report-server-id
+udp,rtu-over-tcp	ro	0	ok=true error=- exc=- fc=43 n=7	server:serverDeviceIdentification,client:clientDeviceIdentification	read-device-identification --category extended	read-device-identification.category-extended

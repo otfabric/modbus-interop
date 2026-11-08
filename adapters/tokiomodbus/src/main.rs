@@ -30,7 +30,7 @@ const UPSTREAM_REVISION: &str = match option_env!("UPSTREAM_REVISION") {
 const FIXTURES: &str = "/fixtures";
 
 const USAGE: &str = "usage:
-  modbus-interop server [--fixture PATH] [--bind-address ADDR] [--port N] [--ready-file PATH]
+  modbus-interop server [--fixture PATH] [--bind-address ADDR] [--port N] [--ready-file PATH] [--transport tcp]
   modbus-interop client <operation> --host HOST [--port N] [--unit-id N]
                         [--connect-timeout-ms N] [--timeout-ms N] [--repeat N] [operation flags]
   modbus-interop print-capabilities
@@ -84,6 +84,11 @@ fn capabilities() -> String {
         // A function code the library does not know is decoded as `Custom`,
         // whatever its length: the MBAP length frames it.
         .boolean("clientRawAnyResponse", true)
+        .boolean("serverIllegalFunction", true)
+        .boolean("serverRejectedWriteUnchanged", true)
+        .boolean("clientLargestRegisterWrites", true)
+        .boolean("serverHighestAddress", true)
+        .boolean("serverLargestRegisterWrites", true)
         .end();
     let operations: Vec<String> = args::OPERATIONS.iter().map(|o| json::quote(o)).collect();
     Obj::new()
@@ -96,6 +101,8 @@ fn capabilities() -> String {
         .raw("features", &features)
         .raw("serverFunctions", "[1,2,3,4,5,6,15,16,22,23,43]")
         .raw("clientOperations", &format!("[{}]", operations.join(",")))
+        // Contract 1.2. tokio-modbus has RTU over any byte stream; this adapter runs TCP only.
+        .raw("transports", r#"{"server":["tcp"],"client":["tcp"]}"#)
         .end()
 }
 

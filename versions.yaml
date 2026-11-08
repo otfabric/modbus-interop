@@ -3,8 +3,8 @@
 # The Dockerfiles are the source of truth for a build:
 # scripts/check-versions.sh fails when this file disagrees with them.
 
-interop_version: "0.3.3"
-contract_version: "1.1"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
+interop_version: "0.4.0"
+contract_version: "1.2"        # docs/CONTAINER_CONTRACT.md, schemaVersion of every document
 fixture_schema: "1.1"          # fixtures/schema/modbus-fixture.schema.json
 
 protocol:
@@ -76,6 +76,62 @@ implementations:
     independent_engine: true
     roles: [server, client]
 
+  j2mod:
+    priority: P1
+    upstream: "j2mod"
+    repository: "https://github.com/steveohara/j2mod"
+    artifact: "com.ghgande:j2mod"
+    version: "3.4.0"
+    revision: "d7861c90f40a7ac219a2dc6987ffa54caa5d47a7"   # tag v3.4.0; information, the build fetches Maven artifacts
+    jar_sha256: "0d4254d260c81bc4b5e1e5be1f77ebc5156f42437d5e8c88907af41f7f11ed9a"
+    license: "Apache-2.0"
+    language: "Java"
+    independent_engine: true
+    roles: [server, client]
+
+  jsmodbus:
+    priority: P1
+    upstream: "jsmodbus"
+    repository: "https://github.com/Cloud-Automation/node-modbus"
+    artifact: "npm:jsmodbus"
+    version: "5.0.0"
+    revision: "fdf02b2600b22519ae4e7465e9bec381a1653172"   # npm gitHead, branch v5.0-dev, no tag; information, the build installs the tarball
+    tarball_integrity: "sha512-YuJlEoWn06eeV4xgMNw8v+07QEaJcq3x7ROtapk3z1QWmbZJn94JkV2yrxULeWIYSrgbLDivifUL2QFq7m/low=="
+    bundled: { commander: "11.1.0", crc: "4.3.2", debug: "4.4.3", ms: "2.1.3" }   # npm, MIT, package-lock.json
+    license: "MIT"
+    language: "JavaScript"
+    independent_engine: true
+    roles: [server, client]
+
+  modbus4j:
+    priority: P1
+    upstream: "modbus4j"
+    repository: "https://github.com/MangoAutomation/modbus4j"
+    artifact: "github archive refs/tags/v3.1.0.tar.gz, built from source (not on Maven Central)"
+    version: "3.1.0"
+    revision: "3325a2cbce786989156ba7999d6adc2755f7ea5b"   # tag v3.1.0
+    source_sha256: "eb20d1fce2d25e3de8e1b67025ca06cf43babd9a249dad82c4a49ebf2fd93344"
+    license: "GPL-3.0-or-later"
+    adapter_license: "GPL-3.0-or-later"   # adapters/modbus4j links it
+    language: "Java"
+    independent_engine: true
+    roles: [server, client]
+    published: false                      # GPL: built locally from the pinned source, never pushed
+
+  modbusesp:
+    priority: P1
+    upstream: "modbus-esp8266"
+    repository: "https://github.com/emelianov/modbus-esp8266"
+    version: "4.1.1"
+    revision: "299666307a052df52f757f3131e292c2513bb57f"   # tag 4.1.1; library.properties says 4.1.0
+    license: "BSD-3-Clause"
+    bundled:
+      cjson: "1.7.18-3.1+deb13u1"   # Debian libcjson1, MIT; ARG CJSON_VERSION
+      gxx: "14.2.0-19"              # Debian g++-14, build only; ARG GXX_VERSION
+    language: "C++"
+    independent_engine: true
+    roles: [server, client]
+
 # OT Fabric's own stacks. Not independent implementations, not in a release of
 # this repository or its manifest.json: see own/<library>/README.md.
 own_implementations:
@@ -97,7 +153,7 @@ base_images:
   debian:
     image: "docker.io/library/debian:trixie-slim"
     digest: "sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4"
-    used_by: [libmodbus, tokiomodbus, otfabric]
+    used_by: [libmodbus, tokiomodbus, modbusesp, otfabric]
   golang:
     image: "docker.io/library/golang:1.27.2-trixie"
     digest: "sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d"
@@ -109,11 +165,11 @@ base_images:
   maven:
     image: "docker.io/library/maven:3.9.16-eclipse-temurin-25-noble"
     digest: "sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976"
-    used_by: [digitalpetri]
+    used_by: [digitalpetri, j2mod, modbus4j]
   jre:
     image: "docker.io/library/eclipse-temurin:25.0.4.1_1-jre-noble"
     digest: "sha256:ce8543ddd3070ccbeaac2106a74c9387ddeb8d47a1c43348345715c1ef245c7f"
-    used_by: [digitalpetri]
+    used_by: [digitalpetri, j2mod, modbus4j]
   dotnet_sdk:
     image: "mcr.microsoft.com/dotnet/sdk:10.0.401-noble"
     digest: "sha256:e70cdb7f80b0348f5cb85f19a8f670fca061f033d57eed12fa003d58b0e06317"
@@ -126,6 +182,10 @@ base_images:
     image: "docker.io/library/rust:1.99.0-slim-trixie"
     digest: "sha256:2752b332db73fdbb7dc576f06c82ed1f312005784ef913d7e04a28f5f55dc581"
     used_by: [tokiomodbus]
+  node:
+    image: "docker.io/library/node:26.13.0-trixie-slim"
+    digest: "sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072"
+    used_by: [jsmodbus]
 
 images:
   libmodbus: "ghcr.io/otfabric/modbus-interop-libmodbus"
@@ -133,6 +193,10 @@ images:
   digitalpetri: "ghcr.io/otfabric/modbus-interop-digitalpetri"
   nmodbus: "ghcr.io/otfabric/modbus-interop-nmodbus"
   tokiomodbus: "ghcr.io/otfabric/modbus-interop-tokiomodbus"
+  j2mod: "ghcr.io/otfabric/modbus-interop-j2mod"
+  jsmodbus: "ghcr.io/otfabric/modbus-interop-jsmodbus"
+  modbus4j: "ghcr.io/otfabric/modbus-interop-modbus4j"   # local tag only, not published
+  modbusesp: "ghcr.io/otfabric/modbus-interop-modbusesp"
 
 platforms:
   - "linux/amd64"

@@ -376,7 +376,7 @@ static int usage(const char *message, const char *detail)
 {
     fprintf(stderr, "modbus-interop server: %s%s\n", message, detail ? detail : "");
     fprintf(stderr, "usage: modbus-interop server [--fixture PATH] [--bind-address ADDR] "
-                    "[--port N] [--ready-file PATH]\n");
+                    "[--port N] [--ready-file PATH] [--transport tcp]\n");
     return EXIT_USAGE;
 }
 
@@ -385,6 +385,7 @@ int server_main(int argc, char **argv)
     const char *fixture_path = DEFAULT_FIXTURE;
     const char *bind_address = "0.0.0.0";
     const char *ready_file = DEFAULT_READY_FILE;
+    const char *transport = "tcp";
     long port = DEFAULT_PORT;
     struct in_addr parsed;
     fixture_t fx;
@@ -409,6 +410,8 @@ int server_main(int argc, char **argv)
             target = &bind_address;
         else if (!strcmp(flag, "--ready-file"))
             target = &ready_file;
+        else if (!strcmp(flag, "--transport"))
+            target = &transport;
         else if (strcmp(flag, "--port") != 0)
             return usage("unknown flag ", flag);
         if (i + 1 >= argc)
@@ -419,6 +422,9 @@ int server_main(int argc, char **argv)
         else if (parse_number(argv[i], 1, 65535, &port) != 0)
             return usage("invalid --port ", argv[i]);
     }
+    /* Contract 1.2: libmodbus is used for Modbus TCP only. */
+    if (strcmp(transport, "tcp") != 0)
+        return usage("--transport: this adapter has only tcp, not ", transport);
     /* modbus_new_tcp() and modbus_tcp_listen() are IPv4. */
     if (inet_pton(AF_INET, bind_address, &parsed) != 1)
         return usage("--bind-address must be an IPv4 address: ", bind_address);

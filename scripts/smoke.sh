@@ -46,7 +46,16 @@ if jq -e --arg a "${ADAPTER}" '
         and (.serverFunctions | type == "array") and (.clientOperations | type == "array")' <<<"${caps}" >/dev/null 2>&1
 then ok "print-capabilities"; else fail "print-capabilities is not a valid capability document: ${caps}"; fi
 if [[ $(wc -l <<<"${caps}") -eq 1 ]]; then ok "print-capabilities is one line"; else fail "print-capabilities printed more than one line"; fi
+# Contract 1.2: "transports" per role, tcp first for a role the image has, and
+# nothing for a role it lacks.
+if jq -e '
+        (.transports | type == "object") and ([.transports.server[], .transports.client[]]
+            | all(. == "tcp" or . == "udp" or . == "rtu-over-tcp"))
+        and (if .roles.server then .transports.server[0] == "tcp" else .transports.server == [] end)
+        and (if .roles.client then .transports.client[0] == "tcp" else .transports.client == [] end)' <<<"${caps}" >/dev/null 2>&1
+then ok "transports: $(jq -c '.transports' <<<"${caps}")"; else fail "transports is missing or invalid: $(jq -c '.transports' <<<"${caps}" 2>/dev/null)"; fi
 has() { jq -e --arg f "$1" '.features[$f] == true' <<<"${caps}" >/dev/null 2>&1; }
+transports_of() { jq -r --arg r "$1" '.transports[$r][]? | select(. != "tcp")' <<<"${caps}" 2>/dev/null; }
 has_role() { jq -e --arg r "$1" '.roles[$r] == true' <<<"${caps}" >/dev/null 2>&1; }
 
 # ---- the baked fixture is the repository's ----
@@ -61,6 +70,7 @@ expect_exit 0 "version" "${IMAGE}" version
 # (Without a command the image runs "server": that is its default.)
 expect_exit 2 "unknown command" "${IMAGE}" frobnicate
 expect_exit 2 "server with an unknown flag" "${IMAGE}" server --frobnicate
+expect_exit 2 "server with an unknown transport" "${IMAGE}" server --transport frobnicate
 if has_role client; then
     expect_exit 2 "client without --host" "${IMAGE}" client read-coils --address 0 --quantity 1
     expect_exit 2 "client with an unknown operation" "${IMAGE}" client frobnicate --host nowhere
@@ -73,6 +83,7 @@ if has_role client; then
     expect_exit 2 "coil value that is not a boolean" "${IMAGE}" client write-single-coil --host nowhere --address 0 --value maybe
     expect_exit 2 "write without --values" "${IMAGE}" client write-multiple-registers --host nowhere --address 0
     expect_exit 2 "unit identifier above 255" "${IMAGE}" client read-coils --host nowhere --address 0 --quantity 1 --unit-id 256
+    expect_exit 2 "client with an unknown transport" "${IMAGE}" client read-coils --host nowhere --address 0 --quantity 1 --transport frobnicate
 fi
 
 # ---- an invalid fixture stops the server before it listens ----
@@ -142,6 +153,9 @@ if has_role client; then
             and .requests == 1 and .responses == 0' <<<"${doc}" >/dev/null 2>&1
     then ok "exception result document"; else fail "read outside the fixture: exit ${CLIENT_EXIT}, ${doc}"; fi
 
+    doc=$(run_client "${ADAPTER}" read-holding-registers --address 0 --quantity 8 --transport tcp --host "${name}"); CLIENT_EXIT=$?
+    if [[ "${CLIENT_EXIT}" == 0 ]] && jq -e '.ok and .response.registers == [0,1,32767,32768,65535,4660,43981,255]' <<<"${doc}" >/dev/null 2>&1
+    then ok "client --transport tcp"; else fail "client --transport tcp: exit ${CLIENT_EXIT}, ${doc}"; fi
     run_client "${ADAPTER}" write-multiple-registers --address 20 --values 7,8,9 --host "${name}" >/dev/null
     run_client "${ADAPTER}" write-single-coil --address 3 --value true --host "${name}" >/dev/null
     sleep 0.3
@@ -172,6 +186,32 @@ last=$(docker logs "${name}" 2>/dev/null | tail -1)
 if [[ "${code}" == 0 ]]; then ok "SIGTERM: exit 0"; else fail "SIGTERM: exit ${code}"; fi
 if jq -e '.event == "stopped"' <<<"${last}" >/dev/null 2>&1; then ok "stopped event"; else fail "last stdout line is not the stopped event: ${last}"; fi
 stop_server "${name}"
+
+# ---- transports other than tcp (contract 1.2) ----
+for transport in $(transports_of server); do
+    name=$(SERVER_TAG="${transport}" start_server "${ADAPTER}" --transport "${transport}")
+    if wait_ready "${name}"; then ok "server --transport ${transport} becomes ready"; else fail "server --transport ${transport} did not become ready"; stop_server "${name}"; continue; fi
+    if jq -e --arg t "${transport}" '(.transports.client // []) | index($t) != null' <<<"${caps}" >/dev/null 2>&1; then
+        doc=$(run_client "${ADAPTER}" read-holding-registers --address 0 --quantity 8 --transport "${transport}" --host "${name}"); CLIENT_EXIT=$?
+        if [[ "${CLIENT_EXIT}" == 0 ]] && jq -e '.ok and .connected and .requests == 1 and .responses == 1
+                and .response == {"function":3,"registers":[0,1,32767,32768,65535,4660,43981,255]}' <<<"${doc}" >/dev/null 2>&1
+        then ok "client --transport ${transport}: result document"; else fail "client --transport ${transport}: exit ${CLIENT_EXIT}, ${doc}"; fi
+        doc=$(run_client "${ADAPTER}" read-holding-registers --address 300 --quantity 1 --transport "${transport}" --host "${name}"); CLIENT_EXIT=$?
+        if [[ "${CLIENT_EXIT}" == 1 ]] && jq -e '.ok == false and .error.code == "exception" and .exception == {"function":131,"code":2}' <<<"${doc}" >/dev/null 2>&1
+        then ok "client --transport ${transport}: exception document"; else fail "client --transport ${transport}: read outside the fixture: exit ${CLIENT_EXIT}, ${doc}"; fi
+    fi
+    docker stop -t 10 "${name}" >/dev/null
+    code=$(docker inspect --format '{{.State.ExitCode}}' "${name}")
+    if [[ "${code}" == 0 ]]; then ok "server --transport ${transport}: SIGTERM, exit 0"; else fail "server --transport ${transport}: SIGTERM, exit ${code}"; fi
+    stop_server "${name}"
+done
+if has_role client; then
+    for transport in $(transports_of client); do
+        doc=$(run_client "${ADAPTER}" read-coils --address 0 --quantity 1 --transport "${transport}" --host "no-such-host-${RUN_ID}" --connect-timeout-ms 1500 --timeout-ms 1500); CLIENT_EXIT=$?
+        if [[ "${CLIENT_EXIT}" == 1 || "${CLIENT_EXIT}" == 3 ]] && jq -e '.ok == false and (.error.code == "connect-failed" or .error.code == "timeout")' <<<"${doc}" >/dev/null 2>&1
+        then ok "client --transport ${transport}, unknown host: $(jq -r '.error.code' <<<"${doc}"), exit ${CLIENT_EXIT}"; else fail "client --transport ${transport}, unknown host: exit ${CLIENT_EXIT}, ${doc}"; fi
+    done
+fi
 
 # ---- a client that waits for a device that never answers ----
 if has_role client; then

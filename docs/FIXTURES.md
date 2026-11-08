@@ -57,7 +57,8 @@ need it name the feature.
 2. **Addresses.** A read or write that lies entirely within the block of its
    table is served. One that touches any address outside it, including a
    table the fixture does not have, is answered with exception 2 (illegal
-   data address), and nothing is written.
+   data address), and nothing is written. For FC15 and FC16 the self-tests
+   check that nothing is written: feature `serverRejectedWriteUnchanged`.
 3. **Quantities.** A quantity of 0, or above the protocol maximum of the
    function, is answered with exception 3 (illegal data value), also when
    the address is outside the block: the quantity is checked first, as in the
@@ -100,7 +101,7 @@ need it name the feature.
    data byte is answered with exception 1 (illegal function). Function code
    0, codes above 127 (no exception response can be encoded for them) and a
    request that is only a function code are outside the rules: a stack may
-   answer or close the connection.
+   answer or close the connection. Feature `serverIllegalFunction`.
 13. **State** is shared by all connections and is reset only by restarting the
    process.
 

@@ -185,7 +185,17 @@ namespace ModbusInterop.NModbusAdapter
             ["read-fifo-queue"] = "NModbus has no Read FIFO Queue (24)",
         };
 
-        private static readonly string[] Common = { "host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat" };
+        private static readonly string[] Common = { "host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat", "transport" };
+
+        /// <summary>Contract 1.2: the adapter runs NModbus over TCP only.</summary>
+        internal static void TcpOnly(Flags flags)
+        {
+            string transport = flags.Text("transport", "tcp");
+            if (transport != "tcp")
+            {
+                throw new UsageException("--transport " + transport + ": this adapter has only tcp");
+            }
+        }
 
         public static int Run(string[] args)
         {
@@ -206,6 +216,7 @@ namespace ModbusInterop.NModbusAdapter
             }
 
             var flags = new Flags(args, 2, Common.Concat(OperationFlags(operation)).ToArray());
+            TcpOnly(flags);
             string host = flags.Text("host");
             if (host.Length == 0)
             {

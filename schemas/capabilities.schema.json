@@ -5,7 +5,7 @@
   "description": "Output of 'print-capabilities'. See docs/CAPABILITIES.md.",
   "type": "object",
   "required": ["schemaVersion", "adapter", "adapterVersion", "protocol", "upstream", "roles", "features",
-               "serverFunctions", "clientOperations"],
+               "serverFunctions", "clientOperations", "transports"],
   "properties": {
     "schemaVersion": { "const": "1.0" },
     "adapter": { "type": "string", "pattern": "^[a-z0-9]+$" },
@@ -35,8 +35,19 @@
                    "clientReadWriteMultiple", "clientDeviceIdentification", "clientRaw", "clientRepeat",
                    "clientUnitIdCheck", "serverDiagnostics", "serverReportServerId", "serverFileRecord",
                    "serverFifoQueue", "clientDiagnostics", "clientReportServerId", "clientReadFileRecord",
-                   "clientWriteFileRecord", "clientFifoQueue", "clientRawAnyResponse"],
+                   "clientWriteFileRecord", "clientFifoQueue", "clientRawAnyResponse",
+                   "serverIllegalFunction", "serverRejectedWriteUnchanged", "clientLargestRegisterWrites", "serverHighestAddress",
+                   "serverLargestRegisterWrites"],
       "additionalProperties": { "type": "boolean" }
+    },
+    "transports": {
+      "type": "object",
+      "required": ["server", "client"],
+      "additionalProperties": false,
+      "properties": {
+        "server": { "$ref": "#/$defs/transportList" },
+        "client": { "$ref": "#/$defs/transportList" }
+      }
     },
     "serverFunctions": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 127 } },
     "clientOperations": {
@@ -47,6 +58,13 @@
                  "mask-write-register", "read-write-multiple-registers", "read-device-identification", "diagnostics",
                  "report-server-id", "read-file-record", "write-file-record", "read-fifo-queue", "raw"]
       }
+    }
+  },
+  "$defs": {
+    "transportList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["tcp", "udp", "rtu-over-tcp"] }
     }
   }
 }

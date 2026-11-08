@@ -15,7 +15,7 @@ namespace ModbusInterop.NModbusAdapter
         private const string FixtureRoot = "/fixtures";
 
         private const string Usage =
-            "usage: modbus-interop server [--fixture PATH] [--bind-address ADDR] [--port N] [--ready-file PATH]\n" +
+            "usage: modbus-interop server [--fixture PATH] [--bind-address ADDR] [--port N] [--ready-file PATH] [--transport tcp]\n" +
             "       modbus-interop client <operation> --host HOST [flags]\n" +
             "       modbus-interop print-capabilities\n" +
             "       modbus-interop print-fixture [NAME]\n" +
@@ -167,6 +167,11 @@ namespace ModbusInterop.NModbusAdapter
                 w.WriteBoolean("clientWriteFileRecord", true);
                 w.WriteBoolean("clientFifoQueue", false);
                 w.WriteBoolean("clientRawAnyResponse", true);
+                w.WriteBoolean("serverIllegalFunction", true);
+                w.WriteBoolean("serverRejectedWriteUnchanged", true);
+                w.WriteBoolean("clientLargestRegisterWrites", true);
+                w.WriteBoolean("serverHighestAddress", true);
+                w.WriteBoolean("serverLargestRegisterWrites", true);
                 w.WriteEndObject();
                 w.WriteStartArray("serverFunctions");
                 foreach (int function in FixtureDevice.Functions)
@@ -182,6 +187,17 @@ namespace ModbusInterop.NModbusAdapter
                 }
 
                 w.WriteEndArray();
+
+                // Contract 1.2. NModbus also has UDP and RTU over a stream;
+                // this adapter runs Modbus TCP only.
+                w.WriteStartObject("transports");
+                w.WriteStartArray("server");
+                w.WriteStringValue("tcp");
+                w.WriteEndArray();
+                w.WriteStartArray("client");
+                w.WriteStringValue("tcp");
+                w.WriteEndArray();
+                w.WriteEndObject();
             });
         }
     }

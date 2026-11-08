@@ -80,7 +80,7 @@ static const struct {
     {"read-fifo-queue", "Read FIFO Queue (FC24)"},
 };
 
-static const char COMMON_FLAGS[] = "host port unit-id connect-timeout-ms timeout-ms repeat";
+static const char COMMON_FLAGS[] = "host port unit-id connect-timeout-ms timeout-ms repeat transport";
 
 typedef struct {
     const op_def_t *op;
@@ -259,6 +259,11 @@ static int parse_arguments(int argc, char **argv, request_t *rq)
     rq->connect_timeout_ms = 5000;
     rq->timeout_ms = 5000;
     rq->repeat = 1;
+
+    /* Contract 1.2: libmodbus is used for Modbus TCP only. */
+    text = flag(&flags, "transport");
+    if (text != NULL && strcmp(text, "tcp") != 0)
+        return usage("--transport %s: this adapter has only tcp", text);
 
     rq->host = flag(&flags, "host");
     if (rq->host == NULL || rq->host[0] == '\0')

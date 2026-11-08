@@ -15,6 +15,9 @@
 #     changes what a later FC20 reads,
 #   - the server reports the requests it answered,
 #   - many requests on one connection and concurrent connections work.
+# Then, for every transport other than tcp (contract 1.2, --transport), the
+# cases of tests/transport-cases.tsv and a write that a later read sees, for
+# the pairings that declare the transport.
 #
 # tests/known-bugs.tsv lists bugs of specific upstream versions; a case they
 # explain is counted as a known bug instead of a failure.
@@ -37,6 +40,7 @@ ADAPTERS=("$@")
 FIXTURE="${ROOT}/fixtures/baseline/fixture.json"
 CASES="${ROOT}/tests/cases.tsv"
 KNOWN_BUGS="${ROOT}/tests/known-bugs.tsv"
+TRANSPORT_CASES="${ROOT}/tests/transport-cases.tsv"
 require_tools
 WORK=$(mktemp -d)
 STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -65,6 +69,10 @@ done
 
 # has <adapter> <feature>: the adapter declares the feature.
 has() { jq -e --arg f "$2" '.features[$f] == true' "${WORK}/caps-$1.json" >/dev/null 2>&1; }
+
+# has_transport <adapter> <server|client> <transport>: the adapter lists the
+# transport for the role (contract 1.2).
+has_transport() { jq -e --arg r "$2" --arg t "$3" '(.transports[$r] // []) | index($t) != null' "${WORK}/caps-$1.json" >/dev/null 2>&1; }
 
 # has_role <adapter> <server|client>
 has_role() { jq -e --arg r "$2" '.roles[$r] == true' "${WORK}/caps-$1.json" >/dev/null 2>&1; }
@@ -196,6 +204,9 @@ for server in "${ADAPTERS[@]}"; do
         pair="${client}->${server}"
         while read -r operation table base first count; do
             at "values.${operation}.${base}-${first}-${count}"
+            if (( base + first + count - 1 == 65535 )) && ! has "${server}" serverHighestAddress; then
+                skip "${pair}: ${operation} ${count} at $((base + first)) (needs server:serverHighestAddress)"; continue
+            fi
             want=$(slice "${table}" "${first}" "${count}")
             got=$(read_values "${client}" "${name}" "${operation}" $((base + first)) "${count}")
             if [[ "${got}" == "${want}" ]]; then ok "${pair}: ${operation} ${count} at $((base + first)) matches the fixture"
@@ -233,11 +244,26 @@ for server in "${ADAPTERS[@]}"; do
         if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC06 is visible to a later read, neighbours untouched"
         else fail "${pair}: read after FC06 returns ${got}, want ${want}"; fi
 
+        # A refused FC15 or FC16 writes nothing (FIXTURES.md rule 2).
+        at values.rejected-write.unchanged
+        if has "${server}" serverRejectedWriteUnchanged; then
+            run_client "${client}" write-multiple-coils --address 1998 --values 1,0,1 --host "${name}" >/dev/null
+            run_client "${client}" write-multiple-registers --address 254 --values 1,2,3 --host "${name}" >/dev/null
+            got="$(read_values "${client}" "${name}" read-coils 1996 4)$(read_values "${client}" "${name}" read-holding-registers 252 4)"
+            want="$(slice coils 1996 4)$(slice holdingRegisters 252 4)"
+            if [[ "${got}" == "${want}" ]]; then ok "${pair}: a refused FC15 or FC16 leaves the device unchanged"
+            else fail "${pair}: after a refused FC15 and FC16 coils 1996.. and registers 252.. are ${got}, want ${want}"; fi
+        else skip "${pair}: a refused write writes nothing (needs server:serverRejectedWriteUnchanged)"; fi
+
         at values.fc16.visible-123
-        run_client "${client}" write-multiple-registers --address 100 --values "$(csv "${regs123}")" --host "${name}" >/dev/null
-        got=$(read_values "${client}" "${name}" read-holding-registers 100 123)
-        if [[ "${got}" == "${regs123}" ]]; then ok "${pair}: FC16 with 123 registers is visible to a later read"
-        else fail "${pair}: read after FC16 with 123 registers returns ${got:0:160}"; fi
+        largest=""
+        if supported "${client}" "${server}" "client:clientLargestRegisterWrites,server:serverLargestRegisterWrites"; then
+            largest=1
+            run_client "${client}" write-multiple-registers --address 100 --values "$(csv "${regs123}")" --host "${name}" >/dev/null
+            got=$(read_values "${client}" "${name}" read-holding-registers 100 123)
+            if [[ "${got}" == "${regs123}" ]]; then ok "${pair}: FC16 with 123 registers is visible to a later read"
+            else fail "${pair}: read after FC16 with 123 registers returns ${got:0:160}"; fi
+        else skip "${pair}: FC16 with 123 registers (needs client:clientLargestRegisterWrites,server:serverLargestRegisterWrites)"; fi
         at values.fc16.neighbours
         got=$(read_values "${client}" "${name}" read-holding-registers 98 2)
         want=$(slice holdingRegisters 98 2)
@@ -289,10 +315,12 @@ for server in "${ADAPTERS[@]}"; do
             else fail "${pair}: FC23 returns ${got}, want ${want}"; fi
             # The largest FC23: 121 registers written, 125 read.
             at values.fc23.largest
-            got=$(run_client "${client}" read-write-multiple-registers --read-address 100 --read-quantity 125 \
-                --write-address 102 --values "$(csv "$(jq -c '.[0:121]' <<<"${regs123}")")" --host "${name}" | jq -c '.response.registers | length')
-            if [[ "${got}" == 125 ]]; then ok "${pair}: FC23 with 121 written and 125 read"
-            else fail "${pair}: FC23 with 121 written and 125 read returned ${got} registers"; fi
+            if [[ -n "${largest}" ]]; then
+                got=$(run_client "${client}" read-write-multiple-registers --read-address 100 --read-quantity 125 \
+                    --write-address 102 --values "$(csv "$(jq -c '.[0:121]' <<<"${regs123}")")" --host "${name}" | jq -c '.response.registers | length')
+                if [[ "${got}" == 125 ]]; then ok "${pair}: FC23 with 121 written and 125 read"
+                else fail "${pair}: FC23 with 121 written and 125 read returned ${got} registers"; fi
+            else skip "${pair}: FC23 with 121 registers written (needs client:clientLargestRegisterWrites,server:serverLargestRegisterWrites)"; fi
         else skip "${pair}: FC23 values"; fi
 
         at values.server-events
@@ -306,7 +334,12 @@ for server in "${ADAPTERS[@]}"; do
                 'fc05|.event == "request" and .function == 5 and .address == 1 and .bits == [false] and .exception == null' \
                 'fc03|.event == "request" and .function == 3 and .address == 100 and .quantity == 123 and .exception == null'
             do
-                at "values.server-events.${want%%|*}"; want="${want#*|}"
+                at "values.server-events.${want%%|*}"
+                # FC16 with 123 registers, and the FC03 read after it, run only with the features.
+                if [[ "${want%%|*}" =~ ^fc(16|03)$ && -z "${largest}" ]]; then
+                    skip "${pair}: server event after FC16 with 123 registers (needs client:clientLargestRegisterWrites,server:serverLargestRegisterWrites)"; continue
+                fi
+                want="${want#*|}"
                 if jq -e -s "map(select(${want})) | length > 0" <<<"${events}" >/dev/null 2>&1; then ok "${pair}: server reports ${want:0:70}"
                 else fail "${pair}: no server event with ${want}"; fi
             done
@@ -412,6 +445,112 @@ for server in "${ADAPTERS[@]}"; do
         rm -rf "${tmp}"
         if [[ "${good}" == 8 ]]; then ok "${pair}: eight concurrent connections"
         else fail "${pair}: only ${good} of 8 concurrent connections returned the fixture"; fi
+    done
+done
+
+# ---- transports other than tcp (contract 1.2) ----
+# One server per adapter and transport is shared by the read-only cases.
+for transport in udp rtu-over-tcp; do
+    for adapter in "${ADAPTERS[@]}"; do
+        has_role "${adapter}" server && has_transport "${adapter}" server "${transport}" || continue
+        name=$(SERVER_TAG="${transport}" start_server "${adapter}" --transport "${transport}")
+        wait_ready "${name}" || exit 1
+    done
+done
+
+n=0
+while IFS=$'\t' read -r transports state want_exit want_summary needs operation id; do
+    [[ -z "${transports}" || "${transports}" == \#* ]] && continue
+    n=$((n + 1))
+    for transport in ${transports//,/ }; do
+        reference="" reference_pair=""
+        for server in "${ADAPTERS[@]}"; do
+            for client in "${ADAPTERS[@]}"; do
+                pair="${client}->${server} (${transport})"
+                at "transport.${transport}.case.${id}"
+                if ! has_transport "${server}" server "${transport}" || ! has_transport "${client}" client "${transport}" \
+                        || ! supported "${client}" "${server}" "${needs}"; then
+                    skip "${pair}: ${operation} (needs ${transport} and ${needs})"
+                    continue
+                fi
+                if [[ "${state}" == "rw" ]]; then
+                    name=$(SERVER_TAG="${transport}-rw" start_server "${server}" --transport "${transport}"); wait_ready "${name}" || exit 1
+                else
+                    name=$(SERVER_TAG="${transport}" server_name "${server}")
+                fi
+                read -ra words <<< "${operation}"
+                doc=$(run_client "${client}" "${words[@]}" --transport "${transport}" --host "${name}"); CLIENT_EXIT=$?
+                [[ "${state}" == "rw" ]] && stop_server "${name}"
+                keep "transport${n}-${transport}-${client}-${server}" "${doc}"
+
+                bug=$(known_bug "${client}" "${server}" "${transport} ${operation}")
+                summary=$(jq -r "${SUMMARY}" <<<"${doc}" 2>/dev/null)
+                if [[ "${summary}" != "${want_summary}" || "${CLIENT_EXIT}" != "${want_exit}" ]]; then
+                    if [[ -n "${bug}" ]]; then
+                        hit_known_bug "${pair}" "${operation}" "${bug}"
+                        continue
+                    fi
+                    fail "${pair}: ${operation}"
+                    log "    want exit=${want_exit} ${want_summary}"
+                    log "    got  exit=${CLIENT_EXIT} ${summary:-<no result document>}"
+                    continue
+                fi
+                ok "${pair}: ${operation}"
+                [[ -n "${bug}" ]] && continue
+
+                at "transport.${transport}.agree.${id}"
+                normalized=$(jq -cS "${NORMALIZE}" <<<"${doc}")
+                if [[ -z "${reference}" ]]; then
+                    reference="${normalized}"; reference_pair="${pair}"
+                elif [[ "${normalized}" != "${reference}" ]]; then
+                    fail "${pair} and ${reference_pair} disagree on: ${operation}"
+                    diff <(jq -S . <<<"${reference}") <(jq -S . <<<"${normalized}") | head -20 >&2
+                else
+                    ok "${pair} agrees with ${reference_pair}: ${operation}"
+                fi
+            done
+        done
+    done
+done < "${TRANSPORT_CASES}"
+
+# A write is visible to a later read over the same transport, and the server
+# reports it.
+for transport in udp rtu-over-tcp; do
+    for server in "${ADAPTERS[@]}"; do
+        has_role "${server}" server && has_transport "${server}" server "${transport}" || continue
+        for client in "${ADAPTERS[@]}"; do
+            has_role "${client}" client && has_transport "${client}" client "${transport}" || continue
+            pair="${client}->${server} (${transport})"
+            name=$(SERVER_TAG="${transport}-rw" start_server "${server}" --transport "${transport}"); wait_ready "${name}" || exit 1
+            at "transport.${transport}.values.fc16.visible-123"
+            largest=""
+            if supported "${client}" "${server}" "client:clientLargestRegisterWrites,server:serverLargestRegisterWrites"; then
+                largest=1
+                run_client "${client}" write-multiple-registers --transport "${transport}" --address 100 --values "$(csv "${regs123}")" --host "${name}" >/dev/null
+                got=$(run_client "${client}" read-holding-registers --transport "${transport}" --address 100 --quantity 123 --host "${name}" | jq -c '.response.registers')
+                if [[ "${got}" == "${regs123}" ]]; then ok "${pair}: FC16 with 123 registers is visible to a later read"
+                else fail "${pair}: read after FC16 with 123 registers returns ${got:0:160}"; fi
+            else skip "${pair}: FC16 with 123 registers (needs client:clientLargestRegisterWrites,server:serverLargestRegisterWrites)"; fi
+            at "transport.${transport}.values.fc15.visible-1968"
+            run_client "${client}" write-multiple-coils --transport "${transport}" --address 16 --values "$(csv "${bits1968}")" --host "${name}" >/dev/null
+            got=$(run_client "${client}" read-coils --transport "${transport}" --address 16 --quantity 1968 --host "${name}" | jq -c '.response.bits')
+            if [[ "${got}" == "${bits1968}" ]]; then ok "${pair}: FC15 with 1968 coils is visible to a later read"
+            else fail "${pair}: read after FC15 with 1968 coils differs from what was written"; fi
+            at "transport.${transport}.values.fc05-fc06.visible"
+            run_client "${client}" write-single-coil --transport "${transport}" --address 0 --value true --host "${name}" >/dev/null
+            run_client "${client}" write-single-register --transport "${transport}" --address 200 --value 51966 --host "${name}" >/dev/null
+            got="$(run_client "${client}" read-coils --transport "${transport}" --address 0 --quantity 1 --host "${name}" | jq -c '.response.bits')$(run_client "${client}" read-holding-registers --transport "${transport}" --address 200 --quantity 1 --host "${name}" | jq -c '.response.registers')"
+            if [[ "${got}" == "[true][51966]" ]]; then ok "${pair}: FC05 and FC06 are visible to a later read"
+            else fail "${pair}: reads after FC05 and FC06 return ${got}, want [true][51966]"; fi
+            if has "${server}" requestEvents && [[ -n "${largest}" ]]; then
+                at "transport.${transport}.values.server-events"
+                sleep 0.3
+                if docker logs "${name}" 2>/dev/null | jq -e -s 'map(select(.event == "request" and .function == 16 and .address == 100 and .quantity == 123 and .exception == null)) | length > 0' >/dev/null 2>&1
+                then ok "${pair}: server reports the FC16 request"
+                else fail "${pair}: no server event for the FC16 request"; fi
+            fi
+            stop_server "${name}"
+        done
     done
 done
 

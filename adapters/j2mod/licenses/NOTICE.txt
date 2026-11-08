@@ -1,0 +1,25 @@
+modbus-interop-j2mod: what the image contains and under which licence.
+
+The exact jars of a build are listed in BUNDLED-JARS.txt (written by the image
+build). They are the unmodified artifacts from Maven Central.
+
+Component                                   Licence        Text
+------------------------------------------  -------------  -----------------------------
+modbus-interop adapter (this repository)    MIT            modbus-interop/LICENSE
+com.ghgande:j2mod                           Apache-2.0     Apache-2.0.txt
+com.fazecast:jSerialComm                    Apache-2.0 OR LGPL-3.0-or-later; used under Apache-2.0, Apache-2.0.txt
+com.google.code.gson:gson                   Apache-2.0     Apache-2.0.txt
+com.google.errorprone:error_prone_annotations  Apache-2.0  Apache-2.0.txt
+org.slf4j:slf4j-api, slf4j-simple           MIT            slf4j-*/LICENSE.txt
+
+Source code:
+  https://github.com/steveohara/j2mod
+  https://github.com/Fazecast/jSerialComm
+
+jSerialComm is a dependency of j2mod (its serial transports); the adapter does
+not use a serial port. j2mod's slf4j-reload4j binding is excluded from the
+build: the library logs through slf4j-simple to stderr.
+
+The Java runtime is Eclipse Temurin (GPL-2.0 WITH Classpath-exception-2.0) from
+the base image; its licence and notices are in /opt/java/openjdk/legal and
+/opt/java/openjdk/NOTICE.

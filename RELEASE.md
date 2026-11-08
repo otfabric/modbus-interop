@@ -21,6 +21,42 @@ manual workflow and no releases (`own/go-modbus/README.md`).
 
 ---
 
+## v0.4.0
+
+**Date:** 2026-11-08
+
+**Previous release:** v0.3.3
+
+## Summary
+
+Contract 1.2: four more reference stacks (j2mod, jsmodbus, modbus-esp8266 and modbus4j), Modbus over UDP and RTU framing over TCP, and five features for behaviour that a stack of the matrix gets wrong.
+
+## Changes
+
+### Added
+
+- **Adapters**, each with a `server` and a `client`: `j2mod` (j2mod 3.4.0, Java), `jsmodbus` (jsmodbus 5.0.0, JavaScript), `modbusesp` (modbus-esp8266 4.1.1, C++, compiled for Linux against an Arduino-core layer with no Modbus logic) and `modbus4j` (modbus4j 3.1.0, Java). Every pin is the latest stable upstream release.
+- **`modbus4j` is GPL-3.0-or-later and is not published**: `make image-modbus4j` builds it from the pinned source archive, and the self-tests include it on every machine that builds it. Its adapter is GPL-3.0-or-later too (REQUIREMENTS R8.1, R8.3). It is not in `manifest.json`.
+- **`--transport`** on `server` and `client`: `tcp` (the default), `udp` and `rtu-over-tcp`, and the capability field `transports` ([docs/CONTAINER_CONTRACT.md](docs/CONTAINER_CONTRACT.md#transports)). j2mod and modbus4j have all three in both roles, jsmodbus and modbus-esp8266 have `tcp` and `rtu-over-tcp`; the five stacks of 1.0 declare `tcp` only. [tests/transport-cases.tsv](tests/transport-cases.tsv) and value checks run every pairing over each transport both sides declare.
+- **Features** `serverIllegalFunction`, `serverRejectedWriteUnchanged`, `serverHighestAddress`, `serverLargestRegisterWrites` and `clientLargestRegisterWrites` ([docs/CAPABILITIES.md](docs/CAPABILITIES.md)). Every adapter declares them; a pairing that lacks one skips the cases, recorded as unsupported.
+- **Self-tests**: a refused FC15 and FC16 must leave the device unchanged (`values.rejected-write.unchanged`).
+
+### Changed
+
+- The out-of-range FC15 and FC16 cases run against a fresh server each, so that a stack that writes part of a refused request cannot change what later read-only cases see.
+- The raw FC65 cases need `serverIllegalFunction`; the reads that end at address 65535 need `serverHighestAddress`; the largest FC16 and FC23 writes, and their server events, need `clientLargestRegisterWrites` and `serverLargestRegisterWrites`.
+- CI and release jobs have longer time limits for the larger matrix.
+
+### Upstream notes
+
+- j2mod closes the connection on an unknown function code over TCP (`IllegalFunctionRequest` skips the MBAP length), and checks no CRC on RTU.
+- jsmodbus never answers a request it cannot decode and stalls the connection; FC16 with 121 to 123 registers is broken in both roles.
+- modbus-esp8266 cannot serve address 65535 (an off-by-one in `addReg`), and its FC20 server and client disagree with the specification on the byte count.
+- modbus4j writes the in-range part of a refused FC15 or FC16, and does not answer an unknown function code over RTU.
+- Details, with PDUs and specification sections: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#findings).
+
+---
+
 ## v0.3.3
 
 **Date:** 2026-11-01

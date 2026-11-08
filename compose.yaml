@@ -47,3 +47,28 @@ services:
     image: ghcr.io/otfabric/modbus-interop-tokiomodbus:${MODBUS_INTEROP_VERSION:-dev}
     ports:
       - "127.0.0.1:1506:1502"
+
+  j2mod:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-j2mod:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1507:1502"
+
+  jsmodbus:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-jsmodbus:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1508:1502"
+
+  modbusesp:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-modbusesp:${MODBUS_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:1510:1502"
+
+  # GPL-3.0-or-later: never published, so always the local build.
+  modbus4j:
+    <<: *server
+    image: ghcr.io/otfabric/modbus-interop-modbus4j:dev
+    ports:
+      - "127.0.0.1:1509:1502"

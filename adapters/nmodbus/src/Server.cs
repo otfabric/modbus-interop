@@ -15,11 +15,12 @@ namespace ModbusInterop.NModbusAdapter
     /// <summary>The "server" command: an NModbus TCP slave network that serves one fixture.</summary>
     internal static class Server
     {
-        private static readonly string[] Allowed = { "fixture", "bind-address", "port", "ready-file" };
+        private static readonly string[] Allowed = { "fixture", "bind-address", "port", "ready-file", "transport" };
 
         public static int Run(string[] args)
         {
             var flags = new Flags(args, 1, Allowed);
+            Client.TcpOnly(flags);
             string fixturePath = flags.Text("fixture", "/fixtures/baseline/fixture.json");
             string bindText = flags.Text("bind-address", "0.0.0.0");
             int port = flags.Number("port", 1, 65535, 1502);

@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        adapter: [libmodbus, pymodbus, digitalpetri, nmodbus, tokiomodbus]
+        adapter: [libmodbus, pymodbus, digitalpetri, nmodbus, tokiomodbus, j2mod, jsmodbus, modbusesp, modbus4j]
     steps:
       - uses: actions/checkout@v7
 

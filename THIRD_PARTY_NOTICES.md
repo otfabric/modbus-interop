@@ -8,8 +8,10 @@ Every image carries the licence texts of what it contains under `/licenses`.
 | Part | Licence |
 |------|---------|
 | Repository tooling, fixtures, schemas, scripts, documentation | MIT ([LICENSE](LICENSE)) |
-| Adapter programs under `adapters/` | MIT |
+| Adapter programs under `adapters/` | MIT, except `adapters/modbus4j/` |
+| `adapters/modbus4j/` (links modbus4j) | GPL-3.0-or-later ([adapters/modbus4j/LICENSE](adapters/modbus4j/LICENSE)) |
 | The published images | the adapter (MIT) together with the components listed below, each under its own licence |
+| Image `modbus-interop-modbus4j` (not published; each user builds it locally) | GPL-3.0-or-later, with the licences of the components listed below |
 
 Nothing in this repository is linked into a consumer: a library that tests
 against the images talks to them over TCP and reads their output, and is not
@@ -94,6 +96,73 @@ Licence texts in the image: `/licenses/NModbus/LICENSE.txt`, `/licenses/dotnet/`
 Licence texts in the image: `/licenses/crates/<crate>-<version>/` for every
 linked crate, with `/licenses/crates/CRATES.txt` listing them and their SPDX
 expressions, and `/licenses/rust-std/`.
+
+## Image `modbus-interop-j2mod`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| j2mod | 3.4.0, commit `d7861c90f40a7ac219a2dc6987ffa54caa5d47a7` (jar `sha256:0d4254d260c81bc4b5e1e5be1f77ebc5156f42437d5e8c88907af41f7f11ed9a`) | Apache-2.0 | https://github.com/steveohara/j2mod |
+| jSerialComm | 2.11.4 | Apache-2.0 OR LGPL-3.0-or-later, used under Apache-2.0 | https://github.com/Fazecast/jSerialComm |
+| slf4j-api | 2.0.9 | MIT | https://www.slf4j.org |
+| slf4j-simple | 2.0.18 | MIT | https://www.slf4j.org |
+| Gson | 2.14.0 | Apache-2.0 | https://github.com/google/gson |
+| error_prone_annotations | 2.48.0 | Apache-2.0 | https://github.com/google/error-prone |
+| Eclipse Temurin JRE | 25.0.4.1+1 | GPL-2.0 with Classpath Exception | https://adoptium.net |
+| Adapter | this repository, `adapters/j2mod/` | MIT | https://github.com/otfabric/modbus-interop |
+| Base system | Ubuntu noble (temurin image) | various; see `/usr/share/doc/*/copyright` in the image | https://ubuntu.com |
+
+Licence texts in the image: `/licenses/NOTICE.txt`, `Apache-2.0.txt` and the
+slf4j licence files.
+
+## Image `modbus-interop-jsmodbus`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| jsmodbus | 5.0.0, git `fdf02b2600b22519ae4e7465e9bec381a1653172` (tarball `sha512-YuJlEoWn06eeV4xgMNw8v+07QEaJcq3x7ROtapk3z1QWmbZJn94JkV2yrxULeWIYSrgbLDivifUL2QFq7m/low==`) | MIT | https://github.com/Cloud-Automation/node-modbus |
+| commander | 11.1.0 | MIT | https://github.com/tj/commander.js |
+| crc | 4.3.2 | MIT | https://github.com/alexgorbatchev/crc |
+| debug | 4.4.3 | MIT | https://github.com/debug-js/debug |
+| ms | 2.1.3 | MIT | https://github.com/vercel/ms |
+| Node.js | 26.13.0 | MIT, with the licences of its bundled components | https://nodejs.org |
+| Adapter | this repository, `adapters/jsmodbus/` | MIT | https://github.com/otfabric/modbus-interop |
+| Base system | Debian trixie-slim (node image) | various; see `/usr/share/doc/*/copyright` in the image | https://www.debian.org |
+
+Licence texts in the image: `/licenses/<package>/` for every npm package and
+`/licenses/BUNDLED-PACKAGES.txt` listing them. The jsmodbus package has no
+licence file; `/licenses/jsmodbus/LICENSE` is the licence section of its README.
+
+## Image `modbus-interop-modbusesp`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| modbus-esp8266 | 4.1.1, commit `299666307a052df52f757f3131e292c2513bb57f` | BSD-3-Clause | https://github.com/emelianov/modbus-esp8266 |
+| cJSON (Debian `libcjson1`) | 1.7.18-3.1+deb13u1 | MIT | https://github.com/DaveGamble/cJSON |
+| Adapter | this repository, `adapters/modbusesp/` | MIT | https://github.com/otfabric/modbus-interop |
+| Base system | Debian trixie-slim | various; see `/usr/share/doc/*/copyright` in the image | https://www.debian.org |
+
+modbus-esp8266 is compiled unmodified from the commit above, statically into
+the adapter binary, with four of its documented compile-time settings changed
+(`adapters/modbusesp/src/settings_overlay.h`). Licence texts in the image:
+`/licenses/modbus-esp8266/LICENSE.txt` with `SOURCE` and `SOURCES.sha256`,
+`/licenses/cjson/copyright`.
+
+## Image `modbus-interop-modbus4j` (not published)
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| modbus4j | 3.1.0, commit `3325a2cbce786989156ba7999d6adc2755f7ea5b` (archive `sha256:eb20d1fce2d25e3de8e1b67025ca06cf43babd9a249dad82c4a49ebf2fd93344`) | GPL-3.0-or-later | https://github.com/MangoAutomation/modbus4j |
+| commons-lang3 | 3.7 | Apache-2.0 | https://commons.apache.org/proper/commons-lang/ |
+| commons-logging | 1.1.1 | Apache-2.0 | https://commons.apache.org/proper/commons-logging/ |
+| Gson | 2.14.0 | Apache-2.0 | https://github.com/google/gson |
+| error_prone_annotations | 2.48.0 | Apache-2.0 | https://github.com/google/error-prone |
+| Eclipse Temurin JRE | 25.0.4.1+1 | GPL-2.0 with Classpath Exception | https://adoptium.net |
+| Adapter | this repository, `adapters/modbus4j/` | GPL-3.0-or-later | https://github.com/otfabric/modbus-interop |
+| Base system | Ubuntu noble (temurin image) | various; see `/usr/share/doc/*/copyright` in the image | https://ubuntu.com |
+
+modbus4j is built unmodified from the pinned source archive (see
+`/licenses/modbus4j/SOURCE` in the image). The image carries the GPL text and
+the adapter's own source. Because of the licence it is never published:
+`make image-modbus4j` builds it from the pinned source on the user's machine.
 
 ## Corresponding source
 

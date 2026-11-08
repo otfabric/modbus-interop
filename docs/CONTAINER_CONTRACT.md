@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **1.1** (`contract_version` in [versions.yaml](../versions.yaml))
+Version: **1.2** (`contract_version` in [versions.yaml](../versions.yaml))
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes. Consumers depend on this document, not on any adapter's source. A
@@ -12,6 +12,7 @@ and changes only with the major version.
 |---------|--------|
 | 1.0 | First release |
 | 1.1 | Operations `diagnostics` (FC08), `report-server-id` (FC17), `read-file-record` (FC20), `write-file-record` (FC21) and `read-fifo-queue` (FC24); the response fields `subFunction`, `file` and `record`; the features for them and `clientRawAnyResponse` ([CAPABILITIES.md](CAPABILITIES.md)); the fixture fields `reportServerId`, `fileRecords` and `fifoQueues` ([FIXTURES.md](FIXTURES.md)). Documents still carry `schemaVersion` `"1.0"` |
+| 1.2 | `--transport` on `server` and `client` ([Transports](#transports)): `tcp` (the default, Modbus TCP as before), `udp` (MBAP in UDP datagrams) and `rtu-over-tcp` (RTU frames on a TCP stream); the capability field `transports`. An adapter accepts `--transport tcp` and every transport it declares; any other is a usage error. The features `serverIllegalFunction`, `serverRejectedWriteUnchanged`, `clientLargestRegisterWrites`, `serverLargestRegisterWrites` and `serverHighestAddress` ([CAPABILITIES.md](CAPABILITIES.md)). Documents still carry `schemaVersion` `"1.0"` |
 
 Not every adapter has every operation or event. What an image lacks it says
 in [`print-capabilities`](#print-capabilities), and an operation it does not
@@ -26,6 +27,7 @@ What a *device* answers to a request is defined by its fixture: see
 - [Commands](#commands)
 - [`server`](#server)
 - [`client`](#client)
+- [Transports](#transports)
 - [`print-capabilities`](#print-capabilities)
 - [`print-fixture`](#print-fixture)
 - [Exit codes](#exit-codes)
@@ -38,8 +40,8 @@ What a *device* answers to a request is defined by its fixture: see
 | Image | `ghcr.io/otfabric/modbus-interop-<adapter>`; OT Fabric's own stack is the adapter `otfabric` |
 | Entrypoint | `modbus-interop` (`/usr/local/bin/modbus-interop`) |
 | Default command | `server` |
-| Protocol | Modbus TCP (MBAP) |
-| Port | 1502/tcp (not 502: the process is not root) |
+| Protocol | Modbus TCP (MBAP); other framings with `--transport` ([Transports](#transports)) |
+| Port | 1502/tcp, and 1502/udp for `--transport udp` (not 502: the process is not root) |
 | User | non-root, uid 10001 |
 | Fixtures | `/fixtures/<name>/fixture.json` (baked in; mount over `/fixtures` to replace) |
 | Readiness file | `/run/modbus-interop/ready` |
@@ -71,6 +73,7 @@ SIGINT.
 | `--bind-address ADDR` | `0.0.0.0` | Listen address |
 | `--port N` | 1502 | Listen port |
 | `--ready-file PATH` | `/run/modbus-interop/ready` | Readiness file |
+| `--transport T` | `tcp` | `tcp`, `udp` or `rtu-over-tcp`, one of `transports.server` in the capabilities ([Transports](#transports)) |
 
 Lifecycle:
 
@@ -139,6 +142,7 @@ connection.
 | `--unit-id N` | 1 | Unit identifier of the request, 0..255 |
 | `--connect-timeout-ms N` | 5000 | TCP connect timeout |
 | `--timeout-ms N` | 5000 | Timeout of the wait for each response |
+| `--transport T` | `tcp` | `tcp`, `udp` or `rtu-over-tcp`, one of `transports.client` in the capabilities ([Transports](#transports)) |
 | `--repeat N` | 1 | Send the request N times (1..1000) on the same connection, each after the response to the one before. Only with the feature `clientRepeat` |
 
 ### Operations
@@ -232,6 +236,38 @@ confirmed.
 | `failed` | Anything else, including responses that differ under `--repeat`; see `message` | 1 |
 
 `message` is for people and not part of the contract.
+
+## Transports
+
+`--transport` selects how the PDUs travel. Every adapter has `tcp`; what else
+it has it lists in `transports` of its [capabilities](CAPABILITIES.md), per
+role. A transport that is not listed for the role is a usage error (exit 2):
+nothing listens and nothing is sent.
+
+| Transport | Framing | Port |
+|-----------|---------|------|
+| `tcp` | Modbus TCP: MBAP header and PDU on a TCP connection (Modbus Messaging on TCP/IP Implementation Guide V1.0b) | 1502/tcp |
+| `udp` | The same MBAP header and PDU, one request or response per UDP datagram | 1502/udp |
+| `rtu-over-tcp` | RTU frames (address, PDU, CRC-16; Modbus over Serial Line V1.02, 2.5.1) on a TCP connection, without MBAP header. Also called "RTU encapsulated" or "RTU over TCP"; not a Modbus specification of its own | 1502/tcp |
+
+What changes with the transport:
+
+- **`udp`.** There is no connection. A client is `connected` once its socket
+  is open, so `connect-failed` is reserved for a socket that cannot be
+  opened or a host name that does not resolve; a device that does not
+  answer is a `timeout`. A server has no `connection-opened` and
+  `connection-closed` events. Each request travels in one datagram and is
+  answered in one datagram, to the address and port it came from.
+- **`rtu-over-tcp`.** The unit identifier is the RTU address. A server
+  answers only requests for the fixture's `unitId`; a request for another
+  address, the broadcast address 0 included, is not answered (Modbus over
+  Serial Line V1.02, 2.2: only the addressed server replies, and nobody
+  replies to a broadcast). A frame with a wrong CRC is not answered either.
+  A client reports a response with a wrong CRC as `invalid-response`.
+- Everything else is the same: operations, flags, result documents,
+  `request` events and exit codes. The unit-identifier, quantity and address
+  rules of [FIXTURES.md](FIXTURES.md) apply on every transport, except rule 1
+  on `rtu-over-tcp` as above.
 
 ## `print-capabilities`
 

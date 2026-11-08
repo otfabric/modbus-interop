@@ -191,7 +191,15 @@ impl Flags {
     }
 }
 
-const COMMON: [&str; 6] = ["host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat"];
+const COMMON: [&str; 7] = ["host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat", "transport"];
+
+/// Contract 1.2: the adapter runs tokio-modbus over TCP only.
+fn tcp_only(flags: &Flags) -> Result<(), String> {
+    match flags.values.get("transport").map(String::as_str) {
+        None | Some("tcp") => Ok(()),
+        Some(other) => Err(format!("--transport {other}: this adapter has only tcp")),
+    }
+}
 
 fn operation_flags(operation: &str) -> Option<&'static [&'static str]> {
     Some(match operation {
@@ -292,6 +300,7 @@ pub fn client(args: &[String]) -> Result<ClientConfig, String> {
         _ => unreachable!("operation_flags() knows every operation"),
     };
 
+    tcp_only(&flags)?;
     Ok(ClientConfig {
         operation: operation.clone(),
         op,
@@ -306,7 +315,8 @@ pub fn client(args: &[String]) -> Result<ClientConfig, String> {
 
 /// `server ...`: `args` starts after the command.
 pub fn server(args: &[String]) -> Result<ServerConfig, String> {
-    let flags = Flags::parse(args, &["fixture", "bind-address", "port", "ready-file"])?;
+    let flags = Flags::parse(args, &["fixture", "bind-address", "port", "ready-file", "transport"])?;
+    tcp_only(&flags)?;
     let text = |name: &str, default: &str| flags.values.get(name).cloned().unwrap_or_else(|| default.to_string());
     let bind = text("bind-address", "0.0.0.0");
     Ok(ServerConfig {

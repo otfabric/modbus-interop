@@ -87,12 +87,39 @@ def tokiomodbus():
     return newest(live), "", "crates.io"
 
 
+def j2mod():
+    meta = fetch("https://repo1.maven.org/maven2/com/ghgande/j2mod/maven-metadata.xml")
+    return newest(re.findall(r"<version>([^<]+)</version>", meta)), "", "Maven Central"
+
+
+def jsmodbus():
+    package = json.loads(fetch("https://registry.npmjs.org/jsmodbus"))
+    live = [v for v, meta in package["versions"].items() if not meta.get("deprecated")]
+    return newest(live), "", "npm"
+
+
+def modbus4j():
+    tags = git_tags("https://github.com/MangoAutomation/modbus4j.git")
+    latest = newest(tags)
+    return latest.removeprefix("v"), tags[latest], "git tags of MangoAutomation/modbus4j"
+
+
+def modbusesp():
+    tags = git_tags("https://github.com/emelianov/modbus-esp8266.git")
+    latest = newest(tags)
+    return latest, tags[latest], "git tags of emelianov/modbus-esp8266"
+
+
 RESOLVERS = {
     "libmodbus": libmodbus,
     "pymodbus": pymodbus,
     "digitalpetri": digitalpetri,
     "nmodbus": nmodbus,
     "tokiomodbus": tokiomodbus,
+    "j2mod": j2mod,
+    "jsmodbus": jsmodbus,
+    "modbus4j": modbus4j,
+    "modbusesp": modbusesp,
 }
 
 

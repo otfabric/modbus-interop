@@ -39,7 +39,7 @@ framework.
 
 ## R2 - Reference implementations
 
-- R2.1 Exactly these five are in scope, in this order of priority:
+- R2.1 Exactly these are in scope, in this order of priority:
 
   | Priority | Implementation | Language | Independent engine |
   |----------|----------------|----------|:------------------:|
@@ -48,6 +48,14 @@ framework.
   | P0 | digitalpetri/modbus | Java | yes |
   | P1 | NModbus | C# | yes |
   | P1 | tokio-modbus | Rust | yes |
+  | P1 | j2mod | Java | yes |
+  | P1 | jsmodbus | JavaScript | yes |
+  | P1 | modbus-esp8266 | C++ | yes |
+  | P1 | modbus4j ¹ | Java | yes |
+
+  ¹ GPL-3.0-or-later: built locally from the pinned source and never
+  published (R8); it takes part in the self-tests on every machine that
+  builds it.
 
 - R2.2 Each is its own image. No image contains two implementations.
 - R2.3 Each image provides both roles where the implementation has them: a
@@ -102,6 +110,11 @@ framework.
 
 ## R8 - Licensing
 
-- R8.1 The repository's own code is MIT-licensed.
+- R8.1 The repository's own code is MIT-licensed, except an adapter that
+  links a library under the GPL: it takes the library's licence
+  (`adapters/modbus4j/`, GPL-3.0-or-later).
 - R8.2 Every image carries the licence texts of what it contains in
   `/licenses`, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists them.
+- R8.3 An image that contains a GPL component is not published: it is built
+  from the pinned source by whoever runs it, and is left out of the release
+  and its `manifest.json` (`published: false` in versions.yaml).

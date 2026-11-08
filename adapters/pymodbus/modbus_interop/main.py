@@ -27,7 +27,7 @@ CLIENT_OPERATIONS = [
 ]
 
 USAGE = """usage:
-  modbus-interop server [--fixture PATH] [--bind-address ADDR] [--port N] [--ready-file PATH]
+  modbus-interop server [--fixture PATH] [--bind-address ADDR] [--port N] [--ready-file PATH] [--transport tcp]
   modbus-interop client <operation> --host HOST [--port N] [--unit-id N]
                         [--connect-timeout-ms N] [--timeout-ms N] [--repeat N] [operation flags]
   modbus-interop print-capabilities
@@ -160,9 +160,17 @@ def capabilities() -> dict:
             # The socket framer frames by the MBAP length and the raw PDU
             # class is registered for the function code of the request.
             "clientRawAnyResponse": True,
+            "serverIllegalFunction": True,
+            "serverRejectedWriteUnchanged": True,
+            "clientLargestRegisterWrites": True,
+            "serverHighestAddress": True,
+            "serverLargestRegisterWrites": True,
         },
         "serverFunctions": [1, 2, 3, 4, 5, 6, 8, 15, 16, 17, 20, 21, 22, 23, 24, 43],
         "clientOperations": CLIENT_OPERATIONS,
+        # Contract 1.2. PyModbus also has UDP and an RTU framer for a TCP
+        # stream; this adapter runs Modbus TCP only.
+        "transports": {"server": ["tcp"], "client": ["tcp"]},
     }
 
 
@@ -171,8 +179,15 @@ def print_json(document: dict) -> None:
     sys.stdout.flush()
 
 
+def tcp_only(given: dict) -> None:
+    """Contract 1.2: --transport accepts the transports this adapter declares."""
+    if given.get("transport", "tcp") != "tcp":
+        raise UsageError(f"--transport {given['transport']}: this adapter has only tcp")
+
+
 def command_server(args: list[str]) -> int:
-    given = flags(args, {"fixture", "bind-address", "port", "ready-file"})
+    given = flags(args, {"fixture", "bind-address", "port", "ready-file", "transport"})
+    tcp_only(given)
     fixture = given.get("fixture", f"{FIXTURES_DIR}/baseline/fixture.json")
     bind_address = given.get("bind-address", "0.0.0.0")
     port = number("--port", given.get("port", "1502"), 1, 65535)
@@ -206,7 +221,8 @@ def client_params(operation: str, args: list[str]) -> dict:
         "read-fifo-queue": {"address"},
         "raw": {"function", "data"},
     }[operation]
-    given = flags(args, common | specific)
+    given = flags(args, common | specific | {"transport"})
+    tcp_only(given)
     host = required(given, "host")
     if not host:
         raise UsageError("--host is empty")

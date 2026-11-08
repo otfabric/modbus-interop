@@ -59,6 +59,11 @@ static int print_capabilities(void)
         /* libmodbus frames a response by its function code: raw cannot
            receive the normal response of a function it does not know. */
         {"clientRawAnyResponse", 0},
+        {"serverIllegalFunction", 1},
+        {"serverRejectedWriteUnchanged", 1},
+        {"clientLargestRegisterWrites", 1},
+        {"serverHighestAddress", 1},
+        {"serverLargestRegisterWrites", 1},
     };
     static const int functions[] = {1, 2, 3, 4, 5, 6, 15, 16, 22, 23};
     static const char *const operations[] = {
@@ -66,7 +71,8 @@ static int print_capabilities(void)
         "write-single-coil", "write-single-register", "write-multiple-coils", "write-multiple-registers",
         "mask-write-register", "read-write-multiple-registers", "report-server-id", "raw"};
     cJSON *doc = cJSON_CreateObject();
-    cJSON *upstream, *roles, *list;
+    cJSON *upstream, *roles, *list, *transports;
+    static const char *const tcp_only[] = {"tcp"};
 
     cJSON_AddStringToObject(doc, "schemaVersion", SCHEMA_VERSION);
     cJSON_AddStringToObject(doc, "adapter", ADAPTER_NAME);
@@ -89,6 +95,10 @@ static int print_capabilities(void)
                           cJSON_CreateIntArray(functions, (int) (sizeof(functions) / sizeof(functions[0]))));
     cJSON_AddItemToObject(doc, "clientOperations",
                           cJSON_CreateStringArray(operations, (int) (sizeof(operations) / sizeof(operations[0]))));
+    /* Contract 1.2. libmodbus has RTU on a serial line, not over TCP. */
+    transports = cJSON_AddObjectToObject(doc, "transports");
+    cJSON_AddItemToObject(transports, "server", cJSON_CreateStringArray(tcp_only, 1));
+    cJSON_AddItemToObject(transports, "client", cJSON_CreateStringArray(tcp_only, 1));
     emit_json(doc);
     return EXIT_OK;
 }

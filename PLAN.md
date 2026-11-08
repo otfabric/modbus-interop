@@ -20,11 +20,24 @@ behaviour where a stack has them (see the matrix in
 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)); fixture fields for server
 ID, file records and FIFO queues; `clientRawAnyResponse`.
 
+## Contract 1.2
+
+Four more stacks: j2mod, jsmodbus, modbus-esp8266 and modbus4j (GPL, built
+locally, never published). `--transport` with `udp` and `rtu-over-tcp`
+besides `tcp`, and the capability field `transports`. The features
+`serverIllegalFunction`, `serverRejectedWriteUnchanged`,
+`clientLargestRegisterWrites`, `serverLargestRegisterWrites` and
+`serverHighestAddress`, so that a stack
+that gets one of these wrong skips the cases instead of failing or being
+waived. The five adapters of 1.0 still declare `tcp` only.
+
 ## Later
 
 | Item | Why it is not in 1.0 |
 |------|----------------------|
-| Modbus RTU over TCP and over a serial line (pseudo-terminal pair between containers) | Needs a second framing in every adapter and a way to connect serial ports across containers |
+| Modbus RTU over a serial line (pseudo-terminal pair between containers) | Needs a way to connect serial ports across containers |
+| `udp` and `rtu-over-tcp` in the five adapters of 1.0 | PyModbus, NModbus and tokio-modbus have such framings; each needs its own adapter work and self-test run |
+| Modbus ASCII over TCP | None of the four new adapters offers it; not yet looked at for the five of 1.0 |
 | Modbus over TLS (Modbus Security) | Few of the stacks support it |
 | FC07, FC11, FC12, and FC08 sub-functions other than Return Query Data | Support differs widely; serial-line functions with little typed support |
 | Several blocks per table, several unit identifiers in one server | libmodbus maps one block per table; needs a custom reply path there |

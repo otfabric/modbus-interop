@@ -37,7 +37,7 @@ func TestClientRejectsAnotherUnitIdentifier(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := &result{}
-	code := exchange(res, op, ln.Addr().String(), 1, 1, time.Second, time.Second)
+	code := exchange(res, op, "tcp://"+ln.Addr().String(), 1, 1, time.Second, time.Second)
 	if code != exitFailed || res.Error == nil || res.Error.Code != "invalid-response" {
 		t.Fatalf("exit %d, error %+v, want exit 1 and invalid-response", code, res.Error)
 	}
