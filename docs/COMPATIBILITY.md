@@ -14,11 +14,23 @@ capabilities come from `print-capabilities` of each image.
 | `digitalpetri` | [digitalpetri/modbus](https://github.com/digitalpetri/modbus) | 2.1.6 | 2026-08-08 | EPL-2.0 | Java |
 | `nmodbus` | [NModbus](https://github.com/NModbus/NModbus) | 3.0.83 | 2026-04-16 | MIT | C# |
 | `tokiomodbus` | [tokio-modbus](https://github.com/slowtec/tokio-modbus) | 0.17.0 | 2025-10-22 | MIT OR Apache-2.0 | Rust |
+| `j2mod` | [j2mod](https://github.com/steveohara/j2mod) | 3.4.0 (`d7861c90`) | 2026-09-06 | Apache-2.0 | Java |
+| `jsmodbus` | [jsmodbus](https://github.com/Cloud-Automation/node-modbus) | 5.0.0 (npm, git `fdf02b26`, untagged) | 2026-09-14 | MIT | JavaScript |
+| `modbusesp` | [modbus-esp8266](https://github.com/emelianov/modbus-esp8266) | 4.1.1 (`29966630`) | 2023-01-03 | BSD-3-Clause | C++ |
+| `modbus4j` | [modbus4j](https://github.com/MangoAutomation/modbus4j) | 3.1.0 (`3325a2cb`) | 2022-01-28 | GPL-3.0-or-later | Java |
 
 Every pin is the latest stable upstream release. The **Upstream** workflow
 checks that every day (`scripts/latest-upstream.py`, and the base-image
 digests), tests a newer release as a candidate and opens an issue when a pin
 is behind.
+
+`modbus4j` is built from the pinned source archive on the machine that runs
+it and never published (GPL-3.0-or-later, REQUIREMENTS R8.3). `modbusesp` is
+an Arduino library: the adapter compiles its Modbus sources unmodified for
+Linux against a small Arduino-core layer with no Modbus logic
+(`adapters/modbusesp/README.md`), with four of its documented compile-time
+settings changed (frame size 253, 16 clients, no one-connection-per-address
+rule, timeouts from `--timeout-ms`).
 
 Two adapters need at least their pinned release, because they use an API
 that is new in it: `digitalpetri` (raw request hooks, 2.1.6) and
@@ -29,32 +41,39 @@ also build and pass on the release before (v3.1.12 and 3.15.0).
 
 ## Capabilities
 
-| Feature | libmodbus | pymodbus | digitalpetri | nmodbus | tokiomodbus |
-|---------|:---------:|:--------:|:------------:|:-------:|:-----------:|
-| Server functions | 1-6, 15, 16, 22, 23 | 1-6, 15, 16, 22, 23, 43 | 1-6, 15, 16, 22, 23 | 1-6, 15, 16, 23 | 1-6, 15, 16, 22, 23, 43 |
-| `serverUnitIdFiltering` | yes ¹ | yes ¹ | yes ¹ | yes ¹ | yes |
-| `serverQuantityCheck` | yes | **no** | yes ¹ | yes ¹ | yes |
-| `serverMaskWrite` (FC22) | yes | yes | yes | **no** | yes |
-| `serverReadWriteMultiple` (FC23) | yes | yes | yes | yes | yes |
-| `serverDeviceIdentification` (FC43/14) | **no** | yes | **no** | **no** | yes |
-| `requestEvents` | yes | yes | yes | yes | yes |
-| `connectionEvents` | yes | yes | yes | **no** | yes |
-| `clientMaskWrite` | yes | yes | yes | **no** | yes |
-| `clientReadWriteMultiple` | yes | yes | yes | yes | yes |
-| `clientDeviceIdentification` | **no** | yes | **no** | yes | yes |
-| `clientRaw` | yes | yes | yes | yes | yes |
-| `clientRepeat` | yes | yes | yes | yes | yes |
-| `clientUnitIdCheck` | **no** | yes | **no** | yes | yes |
-| `serverDiagnostics` (FC08, Return Query Data) | **no** | yes | **no** | yes ² | **no** |
-| `serverReportServerId` (FC17) | **no** ³ | yes | **no** | **no** | **no** ⁴ |
-| `serverFileRecord` (FC20, FC21) | **no** | yes | **no** | **no** | **no** |
-| `serverFifoQueue` (FC24) | **no** | yes | **no** | **no** | **no** |
-| `clientDiagnostics` | **no** | yes | **no** | **no** | **no** |
-| `clientReportServerId` | yes | yes | **no** | **no** | yes |
-| `clientReadFileRecord` | **no** | yes | **no** | **no** | **no** |
-| `clientWriteFileRecord` | **no** | yes | **no** | yes | **no** |
-| `clientFifoQueue` | **no** | yes | **no** | **no** | **no** |
-| `clientRawAnyResponse` | **no** | yes | yes | yes | yes |
+| Feature | libmodbus | pymodbus | digitalpetri | nmodbus | tokiomodbus | j2mod | jsmodbus | modbusesp | modbus4j |
+|---------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Server functions | 1-6, 15, 16, 22, 23 | 1-6, 8, 15-17, 20-24, 43 | 1-6, 15, 16, 22, 23 | 1-6, 8, 15, 16, 23 | 1-6, 15, 16, 22, 23, 43 | 1-6, 15, 16, 20-24 | 1-6, 15, 16, 43 | 1-6, 15, 16, 20-23 | 1-7, 15-17 |
+| Transports (server) | tcp | tcp | tcp | tcp | tcp | tcp, udp, rtu-over-tcp | tcp, rtu-over-tcp | tcp, rtu-over-tcp | tcp, udp, rtu-over-tcp |
+| Transports (client) | tcp | tcp | tcp | tcp | tcp | tcp, udp, rtu-over-tcp | tcp, rtu-over-tcp | tcp, rtu-over-tcp | tcp, udp, rtu-over-tcp |
+| `serverUnitIdFiltering` | yes ¹ | yes ¹ | yes ¹ | yes ¹ | yes | yes ¹ | yes ¹ | yes ¹ | **no** |
+| `serverQuantityCheck` | yes | **no** | yes ¹ | yes ¹ | yes | yes ¹ | **no** | yes ¹ | **no** |
+| `serverMaskWrite` | yes | yes | yes | **no** | yes | yes | **no** | yes | **no** |
+| `serverReadWriteMultiple` | yes | yes | yes | yes | yes | yes | **no** | yes | **no** |
+| `serverDeviceIdentification` | **no** | yes | **no** | **no** | yes | **no** | yes ¹ | **no** | **no** |
+| `requestEvents` | yes | yes | yes | yes | yes | yes | yes | **no** | **no** |
+| `connectionEvents` | yes | yes | yes | **no** | yes | yes | yes | **no** | **no** |
+| `clientMaskWrite` | yes | yes | yes | **no** | yes | yes | **no** | yes | yes |
+| `clientReadWriteMultiple` | yes | yes | yes | yes | yes | yes | **no** | yes | **no** |
+| `clientDeviceIdentification` | **no** | yes | **no** | yes | yes | yes | yes | **no** | **no** |
+| `clientRaw` | yes | yes | yes | yes | yes | **no** | **no** | yes | **no** |
+| `clientRepeat` | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| `clientUnitIdCheck` | **no** | yes | **no** | yes | yes | **no** | **no** | **no** | yes |
+| `serverDiagnostics` | **no** | yes | **no** | yes ² | **no** | **no** | **no** | **no** | **no** |
+| `serverReportServerId` | **no** ³ | yes | **no** | **no** | **no** ⁴ | **no** | **no** | **no** | yes |
+| `serverFileRecord` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
+| `serverFifoQueue` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
+| `clientDiagnostics` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
+| `clientReportServerId` | yes | yes | **no** | **no** | yes | yes | **no** | **no** | yes |
+| `clientReadFileRecord` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
+| `clientWriteFileRecord` | **no** | yes | **no** | yes | **no** | yes | **no** | yes | **no** |
+| `clientFifoQueue` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
+| `clientRawAnyResponse` | **no** | yes | yes | yes | yes | **no** | **no** | yes | **no** |
+| `serverIllegalFunction` | yes | yes | yes | yes | yes | **no** | **no** | yes | **no** |
+| `serverRejectedWriteUnchanged` | yes | yes | yes | yes | yes | yes | yes | yes ¹ | **no** |
+| `clientLargestRegisterWrites` | yes | yes | yes | yes | yes | yes | **no** | yes | yes |
+| `serverHighestAddress` | yes | yes | yes | yes | yes | yes | yes | **no** | yes |
+| `serverLargestRegisterWrites` | yes | yes | yes | yes | yes | yes | **no** | yes | yes |
 
 ¹ The behaviour comes from adapter code placed in front of the library
 through its public extension points, not from the library as shipped. What
@@ -82,16 +101,28 @@ in libmodbus, digitalpetri and the NModbus server).
 ## Cross-stack matrix
 
 Every client runs every case of [tests/cases.tsv](../tests/cases.tsv) against
-every server, 25 pairings, and all pairings must produce the same result
-document for a case. With the pins above there is no failure and no
-disagreement between any two stacks; a pairing skips the cases whose features
-it lacks:
+every server, 81 pairings, and all pairings must produce the same result
+document for a case. Pairings that both declare `udp` or `rtu-over-tcp` run
+[tests/transport-cases.tsv](../tests/transport-cases.tsv) and the write checks
+over that transport as well: j2mod and modbus4j over `udp`, j2mod, jsmodbus,
+modbus-esp8266 and modbus4j over `rtu-over-tcp`.
+
+With the pins above, on linux/arm64 (2026-11-08): **9453 pass, 0 fail, 5007
+unsupported, 0 known differences**. There is no disagreement between any two
+stacks. A pairing skips the cases whose features it lacks; the largest groups:
 
 | Skipped for | Cases |
 |-------------|-------|
-| any client against the `pymodbus` server | the `serverQuantityCheck` cases |
-| `nmodbus` as client or server | FC22 |
-| `libmodbus` and `digitalpetri` as client or server, `nmodbus` as server | FC43 |
+| any client against the `pymodbus`, `jsmodbus` and `modbus4j` servers | the `serverQuantityCheck` cases |
+| `nmodbus`, `jsmodbus` as client or server; the `modbus4j` server | FC22 |
+| `jsmodbus`, `modbus4j` as client or server | FC23 |
+| `libmodbus`, `digitalpetri`, `j2mod`, `modbusesp`, `modbus4j` servers; the `libmodbus`, `digitalpetri`, `modbusesp`, `modbus4j` clients; the `nmodbus` server | FC43 |
+| `j2mod`, `jsmodbus`, `modbus4j` clients | `raw` |
+| the `j2mod`, `jsmodbus`, `modbus4j` servers | the unknown function code (`serverIllegalFunction`) |
+| the `modbus4j` server | a refused FC15/FC16 writes nothing (`serverRejectedWriteUnchanged`); another unit identifier |
+| the `modbusesp` server | reads that end at address 65535 (`serverHighestAddress`) |
+| the `jsmodbus` client or server | FC16 with 123 registers, FC23 with 121 written (`clientLargestRegisterWrites`, `serverLargestRegisterWrites`) |
+| the five stacks of contract 1.0 | everything over `udp` and `rtu-over-tcp`: they declare `tcp` only |
 
 `clientUnitIdCheck`, and the error codes `invalid-response` and
 `connection-lost`, are not exercised by the self-tests: they need a
@@ -211,6 +242,129 @@ as the adapter is; with `panic = "abort"` the server process ends.
 - Over-limit writes (FC16 above 123 registers, FC23 above 121 written) close
   the connection before the service sees them, so `serverQuantityCheck` is
   true for the reads and for quantity 0, not for those.
+
+### j2mod 3.4.0
+
+The adapter answers requests through its own accept loop on the library's
+public `TCPSlaveConnection` and `ModbusUDPTransport`, with a gate in front for
+the [FIXTURES.md](FIXTURES.md) rules the library lacks; the library builds
+every response. Details and hex in `adapters/j2mod/README.md`.
+
+- **Unknown function code over TCP closes the connection** (spec 7):
+  `00010000000401410102` gets no answer instead of `c101`.
+  `IllegalFunctionRequest.readData` skips the MBAP length instead of the data
+  length and reads past the frame. UDP answers `c101`; on rtu-over-tcp the
+  stream goes out of step. `serverIllegalFunction` false.
+- The library's own `ModbusSlave` answers another unit with `8302`, also on
+  RTU (Serial Line V1.02, 2.2: no answer); checks no quantities (`0300000000`
+  is answered `0300`, spec 6.3); takes FC05 value 0x1234 as OFF (spec 6.5:
+  exception 3). The adapter's gate corrects all three.
+- On rtu-over-tcp neither role checks the CRC (Serial Line V1.02, 2.5.1.2).
+- FC16 with byte count 3 for 2 registers, and FC21 without a sub-request,
+  close the connection (spec 6.12: exception 3; the FC21 case is a
+  `NullPointerException`).
+- FC20 with two sub-requests (spec 6.14): `140e0600010000000206000200000002`
+  is answered `140c0506000b0506000100020000`, expected
+  `140c0506000b01a4050600010002` (`ReadFileRecordResponse.getMessage`
+  advances the offset wrongly). Not in the self-tests, which read one
+  sub-request.
+- Over UDP, FC24 and FC20 responses are framed by a data length that is never
+  updated: FC24 `1804de` is answered one byte short, the empty queue carries
+  3 stale bytes, FC20 is answered with MBAP length 0 and no PDU.
+- FC23 writes before it checks the read range, and FC21 stops part-way
+  through its sub-requests; the adapter checks both before the library runs.
+- Client: `WriteCoilResponse` sign-extends the echoed address (32768 reads as
+  -32768); the adapter reports `invalid-response`. A response with another
+  unit identifier is accepted over TCP (`clientUnitIdCheck` false).
+
+### jsmodbus 5.0.0
+
+The server is created without its tables, the library's documented hook, so
+every decoded request reaches an application event with a send callback; the
+adapter answers it with the library's own response and exception classes.
+Details in `adapters/jsmodbus/README.md`.
+
+- **A request the decoder cannot read is never answered, and nothing after
+  it on the connection is decoded**: FC65 `410102`, FC07, FC08, FC22 (spec 7:
+  exception 1), FC01 with 2001 coils (6.1: exception 3), FC15 with too few
+  data bytes (6.11). `serverIllegalFunction` and `serverQuantityCheck` false.
+- **FC16 with 121 to 123 registers is broken in both roles** (spec 6.12): the
+  request body caps the byte count at 0xF6. The client sends quantity 123 and
+  byte count 246 with 240 data bytes; the RTU server frames requests by the
+  capped count, misses the CRC and stalls. 120 registers work.
+  `clientLargestRegisterWrites` and `serverLargestRegisterWrites` false.
+- As shipped: no unit-id filtering, no address or quantity checks (FC03 at
+  5000 answers `0300`; quantity 126 answers a 254-byte PDU, above the 253 of
+  spec 4.1), FC05 value 0x1234 turns the coil off (6.5), FC16 takes byte count
+  / 2 and ignores the quantity (6.12).
+- FC43 exceptions carry the MEI type byte (`ab0e01`); spec 6.21 defines the
+  exception as `ab` and the code. The adapter's own answers use two bytes.
+- Requests that arrive in one TCP segment are served last in, first out: FC06
+  followed by FC03 returns the value from before the write.
+- Client: the RTU client cannot decode an FC43 exception and times out; an
+  exception code outside 1-6, 8, 10, 11 throws inside its data handler; a
+  closed RTU connection is noticed only at the timeout; a response for
+  another unit is dropped silently (`clientUnitIdCheck` false). The client
+  checks no counts or write echoes; the adapter does.
+
+### modbus-esp8266 4.1.1
+
+Line numbers are of the tag. Details in `adapters/modbusesp/README.md`.
+
+- **Address 65535 is unusable** (spec 4.4): `addReg` caps the count with
+  `0xFFFF - address < numregs` (Modbus.cpp:65), so no register is created at
+  65535, and the read and write checks have the same off-by-one.
+  `04 ffff 0001` and `04 ff83 007d` are answered `84 02`.
+  `serverHighestAddress` false.
+- FC20 server: the byte count is two too large (`14 07 06 0001 0000 0002` is
+  answered `14 08 05 06 000b 01a4`; spec 6.14 gives 06). The response size is
+  a `uint8_t`, so a response over 255 bytes overflows its buffer; the adapter
+  refuses such requests with exception 2 before the library copies anything.
+  `serverFileRecord` false.
+- FC20 client: refuses every correctly framed response, accepts only its own
+  server's inflated count, and requires sub-response lengths the spec's own
+  example does not have. `clientReadFileRecord` false.
+- Reads check only the first address, and a bad quantity is exception 2, not
+  3 (spec 6.1-6.4); the documented `MODBUS_STRICT_REG` setting does not
+  compile. FC23 checks the read range twice and the write range never, and
+  writes before it checks. Write quantity limits are above the spec (FC15
+  2000, FC16 125, FC23 125 written). The adapter's checks cover all of these.
+- A short PDU is read past its end; `ModbusRTUTemplate::_slaveId` is not
+  initialised.
+- Client: an RTU response with a bad CRC is dropped silently, so the client
+  times out; neither write echoes nor the unit identifier are checked.
+
+### modbus4j 3.1.0
+
+Built unmodified from the source archive. Details in
+`adapters/modbus4j/README.md`.
+
+- **A refused FC15 or FC16 has already written the part inside the block**
+  (spec 6.11/6.12 state diagrams; FIXTURES.md rule 2): FC15 at 1998 with
+  three coils sets coils 1998-1999, FC16 at 254 with three registers sets
+  254-255, then exception 2 is answered. The process image hands the adapter
+  one value at a time, so it cannot refuse the request as a whole.
+  `serverRejectedWriteUnchanged` false.
+- Over rtu-over-tcp an unknown function code is not answered (the library
+  throws while computing the CRC); over tcp and udp it is exception 1.
+  `serverIllegalFunction` false.
+- No answer at all for a request for another unit (FIXTURES rule 1) or with a
+  bad quantity (`0300000000`, `030000007e`; spec 6.1, 6.3).
+  `serverUnitIdFiltering` and `serverQuantityCheck` false.
+- FC15 with 1969 coils is served and written (6.11: at most 1968); FC05 with
+  value 0x1234 switches the coil off (6.5); FC16 ignores the quantity field
+  and writes as many registers as the byte count holds (6.12).
+- The server answers FC22 with exception 1: the request parser has FC22
+  commented out, although the client sends it.
+- A request that follows an unknown function code in the same segment is
+  lost; the MBAP length is ignored, so extra bytes start the next frame.
+  Unit 0 over TCP is not answered, but its write is executed.
+- Client: with keep-alive the master resends a failed request on a new
+  connection even with no retries (the adapter keeps connections only for
+  `--repeat`); a response with a wrong unit, transaction, function or CRC is
+  dropped and the request times out; the UDP master accepts a response with
+  another transaction identifier; a closed connection is reported as a
+  timeout. One timeout covers both connect and response.
 
 ### Diagnostics, Report Server ID, file records and FIFO queues
 

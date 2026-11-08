@@ -2,7 +2,7 @@
 
 ## What this is
 
-Independent Modbus TCP client and server implementations (libmodbus, PyModbus, digitalpetri/modbus, NModbus, tokio-modbus) in containers behind one command-line contract, with deterministic fixtures, used as oracles by go-modbus and modbusctl. Nothing here depends on go-modbus. Profile: **interoperability**.
+Independent Modbus TCP client and server implementations (libmodbus, PyModbus, digitalpetri/modbus, NModbus, tokio-modbus, j2mod, jsmodbus, modbus-esp8266, modbus4j) in containers behind one command-line contract, with deterministic fixtures, used as oracles by go-modbus and modbusctl. Nothing here depends on go-modbus. Profile: **interoperability**.
 
 ## Organisation standards
 

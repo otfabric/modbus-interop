@@ -151,6 +151,10 @@ func runClient(args []string) int {
 	connectMs := f.optional("connect-timeout-ms", 5000, 1, 3600000)
 	timeoutMs := f.optional("timeout-ms", 5000, 1, 3600000)
 	repeat := f.optional("repeat", 1, 1, 1000)
+	scheme, known := clientSchemes[f.text("transport", "tcp")]
+	if !known {
+		f.fail("--transport must be one of tcp, udp, rtu-over-tcp")
+	}
 	op := build(f)
 	if err := f.finish(); err != nil {
 		return usage(err.Error())
@@ -158,17 +162,21 @@ func runClient(args []string) int {
 
 	started := time.Now()
 	res := &result{SchemaVersion: "1.0", Adapter: adapterName, Operation: name, UnitID: unit}
-	code := exchange(res, op, net.JoinHostPort(host, strconv.Itoa(port)), uint8(unit), repeat,
+	code := exchange(res, op, scheme+"://"+net.JoinHostPort(host, strconv.Itoa(port)), uint8(unit), repeat,
 		time.Duration(connectMs)*time.Millisecond, time.Duration(timeoutMs)*time.Millisecond)
 	res.ElapsedMs = time.Since(started).Milliseconds()
 	printJSON(res)
 	return code
 }
 
+// clientSchemes maps the contract's --transport values (1.2) to go-modbus URL
+// schemes.
+var clientSchemes = map[string]string{"tcp": "tcp", "udp": "udp", "rtu-over-tcp": "rtuovertcp"}
+
 // exchange connects and sends the request repeat times on that connection.
-func exchange(res *result, op operation, address string, unit uint8, repeat int, connect, timeout time.Duration) int {
+func exchange(res *result, op operation, url string, unit uint8, repeat int, connect, timeout time.Duration) int {
 	client, err := modbus.New(modbus.Config{
-		URL:         "tcp://" + address,
+		URL:         url,
 		Timeout:     timeout,
 		DialTimeout: connect,
 	})

@@ -1,0 +1,28 @@
+modbus-interop-modbus4j: what the image contains and under which licence.
+
+This image is built locally and not published: modbus4j is GPL-3.0-or-later,
+and so is the adapter that links it.
+
+The exact jars of a build are listed in BUNDLED-JARS.txt (written by the image
+build). modbus4j is built from its release source (modbus4j/SOURCE names the
+archive, its SHA-256 and its commit); the others are the unmodified artifacts
+from Maven Central.
+
+Component                                   Licence           Text
+------------------------------------------  ----------------  ----------------------------------
+modbus-interop-modbus4j adapter             GPL-3.0-or-later  modbus-interop-modbus4j/LICENSE
+  (adapters/modbus4j; its source is in modbus-interop-modbus4j/source)
+fixtures, from the repository               MIT               modbus-interop/LICENSE
+com.infiniteautomation:modbus4j             GPL-3.0-or-later  modbus4j/license.txt
+org.apache.commons:commons-lang3            Apache-2.0        commons-lang3-*/LICENSE.txt, NOTICE.txt
+commons-logging:commons-logging             Apache-2.0        commons-logging-*/LICENSE, NOTICE
+com.google.code.gson:gson                   Apache-2.0        Apache-2.0.txt
+com.google.errorprone:error_prone_annotations  Apache-2.0     Apache-2.0.txt
+
+Source code of modbus4j:
+  https://github.com/MangoAutomation/modbus4j, tag v3.1.0,
+  commit 3325a2cbce786989156ba7999d6adc2755f7ea5b
+
+The Java runtime is Eclipse Temurin (GPL-2.0 WITH Classpath-exception-2.0) from
+the base image; its licence and notices are in /opt/java/openjdk/legal and
+/opt/java/openjdk/NOTICE.

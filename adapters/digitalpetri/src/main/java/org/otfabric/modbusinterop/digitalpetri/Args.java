@@ -39,6 +39,14 @@ final class Args {
         }
     }
 
+    /** Contract 1.2: the adapter runs the library's Modbus TCP transport only. */
+    static void tcpOnly(Args args) throws UsageException {
+        String transport = args.string("transport", "tcp");
+        if (!transport.equals("tcp")) {
+            throw new UsageException("--transport " + transport + ": this adapter has only tcp");
+        }
+    }
+
     boolean has(String name) {
         return values.containsKey(name);
     }

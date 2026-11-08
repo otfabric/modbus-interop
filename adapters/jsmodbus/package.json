@@ -1,0 +1,15 @@
+{
+  "name": "modbus-interop-jsmodbus",
+  "version": "0.0.0",
+  "private": true,
+  "description": "modbus-interop adapter for jsmodbus (Cloud-Automation/node-modbus)",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "jsmodbus": "5.0.0"
+  }
+}

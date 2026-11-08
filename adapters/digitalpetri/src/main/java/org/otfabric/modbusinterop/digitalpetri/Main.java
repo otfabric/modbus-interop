@@ -159,6 +159,11 @@ public final class Main {
         features.addProperty("clientFifoQueue", false);
         // sendRawAsync frames the response by the MBAP length and hands back the PDU untouched.
         features.addProperty("clientRawAnyResponse", true);
+        features.addProperty("serverIllegalFunction", true);
+        features.addProperty("serverRejectedWriteUnchanged", true);
+        features.addProperty("clientLargestRegisterWrites", true);
+        features.addProperty("serverHighestAddress", true);
+        features.addProperty("serverLargestRegisterWrites", true);
 
         JsonArray functions = new JsonArray();
         for (int function : Device.FUNCTIONS) {
@@ -179,6 +184,13 @@ public final class Main {
         doc.add("features", features);
         doc.add("serverFunctions", functions);
         doc.add("clientOperations", operations);
+        // Contract 1.2: Modbus TCP only (the adapter uses modbus-tcp, not the library's serial modules).
+        JsonObject transports = new JsonObject();
+        JsonArray tcp = new JsonArray();
+        tcp.add("tcp");
+        transports.add("server", tcp);
+        transports.add("client", tcp.deepCopy());
+        doc.add("transports", transports);
         return doc;
     }
 }

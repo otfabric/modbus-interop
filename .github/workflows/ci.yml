@@ -56,7 +56,8 @@ jobs:
   selftest:
     name: Build, smoke, cross-stack (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    # Nine images, 81 pairings, three transports: about an hour per run.
+    timeout-minutes: 150
     needs: validate
     strategy:
       fail-fast: false

@@ -30,9 +30,21 @@ RETRY := scripts/retry.sh
 # Name of the docker-container builder "make buildx-setup" creates.
 BUILDER ?= modbus-interop
 
-# Adapters with a published image, in priority order. The self-tests run over
-# all of them; override to work on one: make smoke ADAPTERS=libmodbus
-ADAPTERS ?= libmodbus pymodbus digitalpetri nmodbus tokiomodbus
+# Adapters with a published image, in priority order; override to work on one:
+# make smoke ADAPTERS=libmodbus
+ADAPTERS ?= libmodbus pymodbus digitalpetri nmodbus tokiomodbus j2mod jsmodbus modbusesp
+
+# Adapters that are built and self-tested like the others but never pushed:
+# their licence keeps the image local (versions.yaml, "published: false").
+LOCAL_ADAPTERS ?= modbus4j
+
+# What is built and self-tested. ADAPTERS given on the command line narrows it
+# to exactly those.
+ifeq ($(origin ADAPTERS),command line)
+SELFTEST_ADAPTERS = $(ADAPTERS)
+else
+SELFTEST_ADAPTERS = $(ADAPTERS) $(LOCAL_ADAPTERS)
+endif
 
 image = $(REGISTRY)/modbus-interop-$(1)
 
@@ -96,7 +108,7 @@ lint: ## Shellcheck the scripts (the installed shellcheck, or a container when t
 
 # ── Local single-arch images (loaded into Docker; used by smoke and interop) ──
 
-images: $(addprefix image-,$(ADAPTERS)) ## Build every adapter image for the host architecture
+images: $(addprefix image-,$(SELFTEST_ADAPTERS)) ## Build every adapter image for the host architecture
 
 image-%: FORCE ## Build one adapter image, e.g. image-libmodbus
 	@echo "Building $* image ($(VERSION))..."
@@ -108,13 +120,13 @@ image-%: FORCE ## Build one adapter image, e.g. image-libmodbus
 
 # ── Self-tests (images must be built) ─────────────────────────────────────────
 
-smoke: $(addprefix smoke-,$(ADAPTERS)) ## Container-contract smoke test of every adapter
+smoke: $(addprefix smoke-,$(SELFTEST_ADAPTERS)) ## Container-contract smoke test of every adapter
 
 smoke-%: FORCE ## Smoke test one adapter, e.g. smoke-pymodbus
 	@scripts/smoke.sh $*
 
 interop: ## Cross-stack self-test: every client against every server
-	@scripts/interop.sh $(ADAPTERS)
+	@scripts/interop.sh $(SELFTEST_ADAPTERS)
 
 # ── Upstream candidates ───────────────────────────────────────────────────────
 # Builds one adapter on another upstream version than the release pin and runs
@@ -135,12 +147,12 @@ candidate-%: FORCE ## Build one adapter on CANDIDATE_VERSION (and CANDIDATE_SHA)
 		--build-arg UPSTREAM_VERSION=$(CANDIDATE_VERSION) $(if $(CANDIDATE_SHA),--build-arg UPSTREAM_SHA=$(CANDIDATE_SHA)) \
 		--tag $(call image,$*):candidate \
 		--file adapters/$*/Dockerfile .
-	@for a in $(filter-out $*,$(ADAPTERS)); do docker tag $(call image,$$a):$(VERSION) $(call image,$$a):candidate || exit 1; done
+	@for a in $(filter-out $*,$(SELFTEST_ADAPTERS)); do docker tag $(call image,$$a):$(VERSION) $(call image,$$a):candidate || exit 1; done
 	@VERSION=candidate scripts/smoke.sh $*
-	@VERSION=candidate scripts/interop.sh $(ADAPTERS)
+	@VERSION=candidate scripts/interop.sh $(SELFTEST_ADAPTERS)
 
 capabilities: ## Print the capability document of every adapter
-	@for a in $(ADAPTERS); do docker run --rm $(call image,$$a):$(VERSION) print-capabilities; done
+	@for a in $(SELFTEST_ADAPTERS); do docker run --rm $(call image,$$a):$(VERSION) print-capabilities; done
 
 # ── Run a reference server on the host ────────────────────────────────────────
 
@@ -163,7 +175,7 @@ buildx-setup: ## Prepare multi-arch builds: QEMU handlers and a docker-container
 builder_flag = $(shell docker buildx inspect $(BUILDER) >/dev/null 2>&1 && echo --builder $(BUILDER))
 
 buildx: ## Build every image for $(PLATFORMS) under emulation, without pushing (local check; CI builds natively on both)
-	@for a in $(ADAPTERS); do \
+	@for a in $(SELFTEST_ADAPTERS); do \
 		echo "Building $$a for $(PLATFORMS)..."; \
 		$(RETRY) docker buildx build $(builder_flag) --platform $(PLATFORMS) \
 			--build-arg BASE_REGISTRY=$(BASE_REGISTRY) --build-arg ADAPTER_VERSION=$(VERSION) \
@@ -223,5 +235,5 @@ clean: ## Remove test containers, networks, local images and reports
 	@docker ps -aq --filter "label=modbus-interop.run" | xargs -r docker rm -f >/dev/null 2>&1 || true
 	@docker network ls --format '{{.Name}}' | grep '^modbus-interop-' | xargs -r docker network rm >/dev/null 2>&1 || true
 	@docker compose down --remove-orphans 2>/dev/null || true
-	@for a in $(ADAPTERS); do docker rmi $(call image,$$a):$(VERSION) 2>/dev/null || true; done
+	@for a in $(SELFTEST_ADAPTERS); do docker rmi $(call image,$$a):$(VERSION) 2>/dev/null || true; done
 	@rm -rf reports

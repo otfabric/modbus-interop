@@ -65,7 +65,7 @@ final class ClientCommand {
             "mask-write-register", "read-write-multiple-registers", "raw");
 
     private static final Set<String> COMMON =
-            Set.of("host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat");
+            Set.of("host", "port", "unit-id", "connect-timeout-ms", "timeout-ms", "repeat", "transport");
 
     /** Extra time on top of a timeout the library enforces itself, in case it does not. */
     private static final long GRACE_MS = 2000;
@@ -121,6 +121,7 @@ final class ClientCommand {
         });
         Args args = new Args(tokens.subList(1, tokens.size()), flags);
 
+        Args.tcpOnly(args);
         String host = args.required("host");
         if (host.isEmpty()) {
             throw new Args.UsageException("--host is empty");

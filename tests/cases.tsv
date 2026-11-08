@@ -38,8 +38,8 @@ ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-holding-registers --address 
 ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-holding-registers --address 256 --quantity 1	read-holding-registers.address-256.quantity-1
 ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-holding-registers --address 65535 --quantity 1	read-holding-registers.address-65535.quantity-1
 ro	0	ok=true error=- exc=- fc=4 n=125	-	read-input-registers --address 65280 --quantity 125	read-input-registers.address-65280.quantity-125
-ro	0	ok=true error=- exc=- fc=4 n=125	-	read-input-registers --address 65411 --quantity 125	read-input-registers.address-65411.quantity-125
-ro	0	ok=true error=- exc=- fc=4 n=1	-	read-input-registers --address 65535 --quantity 1	read-input-registers.address-65535.quantity-1
+ro	0	ok=true error=- exc=- fc=4 n=125	server:serverHighestAddress	read-input-registers --address 65411 --quantity 125	read-input-registers.address-65411.quantity-125
+ro	0	ok=true error=- exc=- fc=4 n=1	server:serverHighestAddress	read-input-registers --address 65535 --quantity 1	read-input-registers.address-65535.quantity-1
 ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-input-registers --address 0 --quantity 1	read-input-registers.address-0.quantity-1
 ro	1	ok=false error=exception exc=2 fc=- n=0	-	read-input-registers --address 65279 --quantity 2	read-input-registers.address-65279.quantity-2
 ro	1	ok=false error=exception exc=11 fc=- n=0	server:serverUnitIdFiltering	read-holding-registers --address 0 --quantity 1 --unit-id 2	read-holding-registers.address-0.quantity-1.unit-id-2
@@ -49,10 +49,10 @@ ro	0	ok=true error=- exc=- fc=3 n=10	client:clientRepeat	read-holding-registers 
 ro	0	ok=true error=- exc=- fc=1 n=64	client:clientRepeat	read-coils --address 0 --quantity 64 --repeat 50	read-coils.address-0.quantity-64.repeat-50
 ro	1	ok=false error=exception exc=2 fc=- n=0	-	write-single-coil --address 2000 --value true	write-single-coil.address-2000.value-true
 ro	1	ok=false error=exception exc=2 fc=- n=0	-	write-single-register --address 256 --value 1	write-single-register.address-256.value-1
-ro	1	ok=false error=exception exc=2 fc=- n=0	-	write-multiple-coils --address 1998 --values 1,0,1	write-multiple-coils.address-1998.values-1-0-1
-ro	1	ok=false error=exception exc=2 fc=- n=0	-	write-multiple-registers --address 254 --values 1,2,3	write-multiple-registers.address-254.values-1-2-3
+rw	1	ok=false error=exception exc=2 fc=- n=0	-	write-multiple-coils --address 1998 --values 1,0,1	write-multiple-coils.address-1998.values-1-0-1
+rw	1	ok=false error=exception exc=2 fc=- n=0	-	write-multiple-registers --address 254 --values 1,2,3	write-multiple-registers.address-254.values-1-2-3
 ro	0	ok=true error=- exc=- fc=3 n=0	client:clientRaw	raw --function 3 --data 00000002	raw.function-3.data-00000002
-ro	1	ok=false error=exception exc=1 fc=- n=0	client:clientRaw	raw --function 65 --data 0102	raw.function-65.data-0102
+ro	1	ok=false error=exception exc=1 fc=- n=0	client:clientRaw,server:serverIllegalFunction	raw --function 65 --data 0102	raw.function-65.data-0102
 ro	1	ok=false error=exception exc=3 fc=- n=0	client:clientRaw,server:serverQuantityCheck	raw --function 3 --data 00000000	raw.function-3.data-00000000
 ro	1	ok=false error=exception exc=3 fc=- n=0	client:clientRaw,server:serverQuantityCheck	raw --function 3 --data 0000007e	raw.function-3.data-0000007e
 ro	1	ok=false error=exception exc=3 fc=- n=0	client:clientRaw,server:serverQuantityCheck	raw --function 1 --data 000007d1	raw.function-1.data-000007d1

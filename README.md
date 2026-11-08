@@ -1,7 +1,7 @@
 # modbus-interop — Modbus TCP Interoperability Testing with Docker
 
 A Docker-based interoperability testing framework for Modbus TCP, providing independent client and server implementations, deterministic fixtures, and automated protocol compatibility testing.
-Test Modbus libraries against established implementations: libmodbus, PyModbus, digitalpetri/modbus, NModbus and tokio-modbus. Reference implementations are independently containerized, enabling reproducible testing across platforms without integrating third-party protocol stacks into production applications.
+Test Modbus libraries against established implementations: libmodbus, PyModbus, digitalpetri/modbus, NModbus, tokio-modbus, j2mod, jsmodbus, modbus-esp8266 and modbus4j. Reference implementations are independently containerized, enabling reproducible testing across platforms without integrating third-party protocol stacks into production applications.
 
 | Adapter | Implementation | Version | Language | Server | Client | Image |
 |---------|----------------|---------|----------|:------:|:------:|-------|
@@ -10,6 +10,10 @@ Test Modbus libraries against established implementations: libmodbus, PyModbus, 
 | `digitalpetri` | [digitalpetri/modbus](https://github.com/digitalpetri/modbus) | 2.1.6 | Java | yes | yes | `ghcr.io/otfabric/modbus-interop-digitalpetri` |
 | `nmodbus` | [NModbus](https://github.com/NModbus/NModbus) | 3.0.83 | C# | yes | yes | `ghcr.io/otfabric/modbus-interop-nmodbus` |
 | `tokiomodbus` | [tokio-modbus](https://github.com/slowtec/tokio-modbus) | 0.17.0 | Rust | yes | yes | `ghcr.io/otfabric/modbus-interop-tokiomodbus` |
+| `j2mod` | [j2mod](https://github.com/steveohara/j2mod) | 3.4.0 | Java | yes | yes | `ghcr.io/otfabric/modbus-interop-j2mod` |
+| `jsmodbus` | [jsmodbus](https://github.com/Cloud-Automation/node-modbus) | 5.0.0 | JavaScript | yes | yes | `ghcr.io/otfabric/modbus-interop-jsmodbus` |
+| `modbusesp` | [modbus-esp8266](https://github.com/emelianov/modbus-esp8266) | 4.1.1 | C++ | yes | yes | `ghcr.io/otfabric/modbus-interop-modbusesp` |
+| `modbus4j` | [modbus4j](https://github.com/MangoAutomation/modbus4j) | 3.1.0 | Java | yes | yes | not published (GPL-3.0-or-later): `make image-modbus4j` builds it locally |
 
 The stacks do not all do the same: not every one has FC22, FC23, Read
 Device Identification, Diagnostics, Report Server ID, file records or FIFO
@@ -147,7 +151,11 @@ modbus-interop/
 │   ├── pymodbus/        Python adapter
 │   ├── digitalpetri/    Java adapter
 │   ├── nmodbus/         C# adapter
-│   └── tokiomodbus/     Rust adapter
+│   ├── tokiomodbus/     Rust adapter
+│   ├── j2mod/           Java adapter
+│   ├── jsmodbus/        JavaScript adapter
+│   ├── modbusesp/       C++ adapter (modbus-esp8266, built for the host)
+│   └── modbus4j/        Java adapter (GPL-3.0-or-later, built locally only)
 ├── fixtures/
 │   ├── schema/          JSON Schema of the fixture format
 │   └── baseline/        the baseline device

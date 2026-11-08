@@ -26,7 +26,8 @@ final class ServerCommand {
     private ServerCommand() {}
 
     static int run(List<String> tokens) throws Args.UsageException {
-        Args args = new Args(tokens, Set.of("fixture", "bind-address", "port", "ready-file"));
+        Args args = new Args(tokens, Set.of("fixture", "bind-address", "port", "ready-file", "transport"));
+        Args.tcpOnly(args);
         Path fixturePath = Path.of(args.string("fixture", Main.FIXTURES + "/baseline/fixture.json"));
         String bindAddress = args.string("bind-address", "0.0.0.0");
         int port = args.number("port", 1502, 1, 65535);

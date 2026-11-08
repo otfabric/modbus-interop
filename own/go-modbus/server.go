@@ -167,6 +167,10 @@ func runServer(args []string) int {
 	bind := f.text("bind-address", "0.0.0.0")
 	port := f.optional("port", 1502, 1, 65535)
 	readyFile := f.text("ready-file", "/run/modbus-interop/ready")
+	// Contract 1.2: the go-modbus server has Modbus TCP (and TLS) only.
+	if transport := f.text("transport", "tcp"); transport != "tcp" {
+		f.fail("--transport %s: the server has only tcp", transport)
+	}
 	if err := f.finish(); err != nil {
 		return usage(err.Error())
 	}
