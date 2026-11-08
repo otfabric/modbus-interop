@@ -383,6 +383,17 @@ for server in "${ADAPTERS[@]}"; do
 2 0 4 1
 FILES
         else skip "${pair}: FC20 values"; fi
+        # Two sub-requests in one FC20 (FIXTURES.md rule 10): records 0..1 of
+        # file 1 and of file 2. Only raw sends more than one.
+        at values.fc20.two-sub-requests
+        if supported "${client}" "${server}" "server:serverFileRecord,client:clientRaw,client:clientRawAnyResponse"; then
+            got=$(run_client "${client}" raw --function 20 --data 0e0600010000000206000200000002 --host "${name}" | jq -r '.response.data')
+            # Byte count 0x0c, then per sub-response: length 5, reference type 6, two registers.
+            want="0c$(jq -r '[.fileRecords[0].records[0:2], .fileRecords[1].records[0:2]][] | map(tostring) | join(" ")' "${FIXTURE}" \
+                | while read -r r0 r1; do printf '0506%04x%04x' "${r0}" "${r1}"; done)"
+            if [[ "${got}" == "${want}" ]]; then ok "${pair}: FC20 with two sub-requests returns the records of both"
+            else fail "${pair}: FC20 with two sub-requests returns ${got}, want ${want}"; fi
+        else skip "${pair}: FC20 with two sub-requests (needs server:serverFileRecord,client:clientRaw,client:clientRawAnyResponse)"; fi
         at values.fc24
         if supported "${client}" "${server}" "server:serverFifoQueue,client:clientFifoQueue"; then
             for index in 0 1 2; do

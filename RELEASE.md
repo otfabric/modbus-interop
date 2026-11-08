@@ -21,6 +21,28 @@ manual workflow and no releases (`own/go-modbus/README.md`).
 
 ---
 
+## v0.4.1
+
+**Date:** 2026-11-09
+
+**Previous release:** v0.4.0
+
+## Summary
+
+j2mod declares `serverFileRecord` false, and the self-tests read two FC20 sub-requests at once.
+
+## Changes
+
+### Fixed
+
+- **`j2mod` declared `serverFileRecord` although j2mod 3.4.0 answers the second of two FC20 sub-requests with the wrong records** (FIXTURES.md rule 10; Modbus Application Protocol V1.1b3, 6.14): `140e0600010000000206000200000002` is answered `140c0506000b0506000100020000`, not `140c0506000b01a4050600010002`. The go-modbus interop suite found it. The server still answers FC20 and FC21 (`serverFunctions`), but the pairings that need `serverFileRecord` now skip the j2mod server.
+
+### Added
+
+- **Self-test** `values.fc20.two-sub-requests`: an FC20 with two sub-requests, sent with `raw`, must return the records of both from the fixture.
+
+---
+
 ## v0.4.0
 
 **Date:** 2026-11-08
