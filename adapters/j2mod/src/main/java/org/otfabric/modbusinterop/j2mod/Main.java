@@ -155,7 +155,10 @@ public final class Main {
         // FC08 and FC17 request classes answer exception 1 on the server side.
         features.addProperty("serverDiagnostics", false);
         features.addProperty("serverReportServerId", false);
-        features.addProperty("serverFileRecord", true);
+        // FC20 with two sub-requests answers the second with the wrong
+        // records (README, finding 5; FIXTURES.md rule 10). FC20 and FC21
+        // are still answered by the library (serverFunctions).
+        features.addProperty("serverFileRecord", false);
         features.addProperty("serverFifoQueue", true);
         features.addProperty("clientDiagnostics", true);
         features.addProperty("clientReportServerId", true);

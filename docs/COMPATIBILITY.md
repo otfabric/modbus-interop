@@ -61,7 +61,7 @@ also build and pass on the release before (v3.1.12 and 3.15.0).
 | `clientUnitIdCheck` | **no** | yes | **no** | yes | yes | **no** | **no** | **no** | yes |
 | `serverDiagnostics` | **no** | yes | **no** | yes ² | **no** | **no** | **no** | **no** | **no** |
 | `serverReportServerId` | **no** ³ | yes | **no** | **no** | **no** ⁴ | **no** | **no** | **no** | yes |
-| `serverFileRecord` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
+| `serverFileRecord` | **no** | yes | **no** | **no** | **no** | **no** | **no** | **no** | **no** |
 | `serverFifoQueue` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
 | `clientDiagnostics` | **no** | yes | **no** | **no** | **no** | yes | **no** | **no** | **no** |
 | `clientReportServerId` | yes | yes | **no** | **no** | yes | yes | **no** | **no** | yes |
@@ -266,8 +266,10 @@ every response. Details and hex in `adapters/j2mod/README.md`.
 - FC20 with two sub-requests (spec 6.14): `140e0600010000000206000200000002`
   is answered `140c0506000b0506000100020000`, expected
   `140c0506000b01a4050600010002` (`ReadFileRecordResponse.getMessage`
-  advances the offset wrongly). Not in the self-tests, which read one
-  sub-request.
+  advances the offset wrongly). Found by the go-modbus interop suite after
+  v0.4.0, which declared `serverFileRecord` true; it is false since v0.4.1,
+  and the self-tests now send two sub-requests
+  (`values.fc20.two-sub-requests`).
 - Over UDP, FC24 and FC20 responses are framed by a data length that is never
   updated: FC24 `1804de` is answered one byte short, the empty queue carries
   3 stale bytes, FC20 is answered with MBAP length 0 and no PDU.

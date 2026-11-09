@@ -152,6 +152,7 @@ both are `connection-lost`.
 | `diagnostics` with other than two data bytes | `ReadSerialDiagnosticsRequest` has exactly one data word. Usage error, nothing sent. |
 | file numbers 10000 and above | `SimpleProcessImage.getFileByNumber` refuses them (exception 2). |
 | `serverIllegalFunction` | Over TCP an unknown function code closes the connection instead of exception 1: `IllegalFunctionRequest.readData` skips the MBAP length rather than the data length and reads past the frame (finding 1). Over UDP the library answers `c101` correctly, but the feature is declared for the adapter. |
+| `serverFileRecord` | FC20 with two sub-requests answers the second one with the wrong records: `ReadFileRecordResponse.getMessage` advances the offset wrongly (finding 5; FIXTURES.md rule 10, spec 6.14). FC20 and FC21 are still answered by the library, with the adapter's checks in front. The self-tests send two sub-requests (`values.fc20.two-sub-requests`). |
 
 ## Findings about the library (3.4.0)
 
