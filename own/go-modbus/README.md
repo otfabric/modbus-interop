@@ -26,7 +26,7 @@ docker run -d --name go-modbus -p 127.0.0.1:1502:1502 ghcr.io/otfabric/modbus-in
 until docker exec go-modbus test -f /run/modbus-interop/ready; do sleep 0.1; done
 ```
 
-`<tag>` is a go-modbus version such as `v1.10.5`, or `latest`, the newest one
+`<tag>` is a go-modbus version such as `v1.11.1`, or `latest`, the newest one
 published. A rebuild of a version replaces its tag, so pin the digest if you need
 an exact build. The digest is in the summary of the
 [workflow run](https://github.com/otfabric/modbus-interop/actions/workflows/own-go-modbus.yml),
