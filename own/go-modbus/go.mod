@@ -4,4 +4,4 @@ go 1.26.0
 
 require github.com/otfabric/go-modbus v1.15.1
 
-require github.com/otfabric/go-serial v0.3.0 // indirect
+require github.com/otfabric/go-serial v0.4.0 // indirect
