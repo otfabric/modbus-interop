@@ -28,7 +28,7 @@ Adapter sources are MIT-licensed like the rest of the repository: keep the `SPDX
 
 ## Moving an upstream pin
 
-1. Change the pin in the adapter's Dockerfile (`ARG UPSTREAM_VERSION`, and `ARG UPSTREAM_SHA` where the build fetches a commit), in whatever the build tool reads it from (`requirements.txt`, `pom.xml`, the `.csproj`, `Cargo.toml` and `Cargo.lock`) and in `versions.yaml`; `scripts/check-versions.sh` must pass.
+1. Change the pin in the adapter's Dockerfile (`ARG UPSTREAM_VERSION`, and `ARG UPSTREAM_SHA` where the build fetches a commit, `ARG UPSTREAM_SOURCE_SHA256` where it fetches an archive), in whatever the build tool reads it from (`requirements.txt`, `pom.xml`, the `.csproj`, `Cargo.toml` and `Cargo.lock`, `package-lock.json`) and in the adapter's entry under `implementations` in `versions.yaml`; `scripts/check-versions.sh` must pass.
 2. `make ci`.
 3. Record the new version, and anything it changed, in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [RELEASE.md](RELEASE.md).
 
@@ -87,6 +87,6 @@ By contributing you agree that your contributions are licensed under the MIT lic
 | Push to a branch | none | nothing; dispatch `ci.yml` to test a branch without a pull request |
 | Push to `main` | `policy.yml` | the light checks; the merged commit was tested as the pull request's merge commit |
 | Schedule | `ci.yml`, `upstream.yml` | the scheduled runs, on `main` |
-| Release | `release.yml` | the release workflow tests the release commit again |
+| Release | `release.yml` | checks that `versions.yaml` and RELEASE.md name the version; on an amd64 and an arm64 runner runs `scripts/check-versions.sh` and the fixture validation, builds every image (`make images`), runs the smoke and cross-stack self-tests and checks their documents against the schemas (`make documents`), and pushes the published images as `<image>:<version>-<arch>`; joins those into the multi-arch `<image>:<version>`, records their digests (a missing one stops the release) and creates the GitHub release with `manifest.json` and `checksums.txt`. It runs no unit tests and no shellcheck (both ran on the pull request) |
 
 Documentation means an added or modified `*.md` file outside `.github/`, `testdata/` and `vendor/`, other than `AGENTS.md` and `CLAUDE.md`. A deleted or renamed document, or any other file, runs everything. `OT Fabric Required Checks` fails unless every job that applies succeeded; its summary lists them.
