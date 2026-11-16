@@ -21,6 +21,40 @@ manual workflow and no releases (`own/go-modbus/README.md`).
 
 ---
 
+## v0.4.2
+
+**Date:** 2026-11-16
+
+**Previous release:** v0.4.1
+
+## Summary
+
+The release refuses a digest list that misses a published image, and `scripts/check-versions.sh` compares every pin with the adapter's own entry in `versions.yaml`. The images, the contract (1.2) and the exit codes are unchanged.
+
+## Changes
+
+### Fixed
+
+- **The release could publish a `manifest.json` with fewer images than `ADAPTERS`.** The step "Digests of the multi-arch images" ran `make -s digests | tee digests.txt` without `pipefail`, so a failed `make digests` did not stop it, and `scripts/release-manifest.py` accepted any list that was not empty. The step now runs with `shell: bash` (`-eo pipefail`), and `release-manifest.py` refuses a list that does not name each adapter of `ADAPTERS` in the Makefile exactly once.
+- **`scripts/check-versions.sh` accepted a `FROM <image>:<tag> AS <stage>` line without a digest**, an upstream version or revision that belongs to another implementation, and did not read `own/*/Dockerfile`. Now every `FROM` names an image by a digest argument the Dockerfile declares (or a literal digest that `versions.yaml` lists) or an earlier stage; `ARG UPSTREAM_VERSION`, `UPSTREAM_SHA`, `UPSTREAM_SOURCE_SHA256` and the bundled package versions (`CJSON_VERSION`, `GXX_VERSION`) must be in the adapter's entry under `implementations`; the `wheel_sha256`, `crate_sha256` and `tarball_integrity` of an entry must be in the adapter's lock file; and the digests of the own Dockerfile are checked like the adapters'.
+
+### Changed
+
+- CI, the release and own-stack workflows and the Makefile's container fallbacks install `jsonschema==4.26.0`; before, the latest jsonschema.
+- CI runs the unit tests of the scripts (`make unittests`).
+
+### Documentation
+
+- README: the isolation sentence names its exception, `own/`.
+- SECURITY.md names all nine upstream stacks, and npm with `package-lock.json` among the sources and lock files.
+- CONTRIBUTING.md: the Release row of "When CI runs" says what `release.yml` runs; moving a pin names the source hash, `package-lock.json` and the adapter's entry in `versions.yaml`.
+
+### Testing
+
+- `scripts/test_check_versions.py` and `scripts/test_release_manifest.py`, run by `make unittests` (and so by `make validate` and CI).
+
+---
+
 ## v0.4.1
 
 **Date:** 2026-11-09

@@ -8,8 +8,9 @@ The release workflow puts the notes of the version (scripts/release-notes.sh)
 in front of the images part.
 
 The digests file holds one "<adapter> <sha256:...>" line per published
-multi-arch image (make digests). Upstream pins are read from the adapter
-Dockerfiles, the contract and fixture versions from versions.yaml.
+multi-arch image (make digests): exactly one for each adapter of ADAPTERS in
+the Makefile, or the release is refused. Upstream pins are read from the
+adapter Dockerfiles, the contract and fixture versions from versions.yaml.
 """
 
 import json
@@ -34,13 +35,31 @@ def manifest_value(key):
     return match.group(1)
 
 
+def published():
+    match = re.search(r"^ADAPTERS \?= (.+)$", (ROOT / "Makefile").read_text(), re.M)
+    if not match:
+        raise SystemExit("the Makefile has no ADAPTERS ?= line")
+    return match.group(1).split()
+
+
 def main():
     if len(sys.argv) != 6:
         raise SystemExit(__doc__)
     version, commit, digests_file, manifest_out, body_out = sys.argv[1:]
-    digests = dict(line.split() for line in Path(digests_file).read_text().splitlines() if line.strip())
-    if not digests:
+    lines = [line.split() for line in Path(digests_file).read_text().splitlines() if line.strip()]
+    if not lines:
         raise SystemExit(f"{digests_file} lists no image")
+    for fields in lines:
+        if len(fields) != 2:
+            raise SystemExit(f"{digests_file}: {' '.join(fields)!r} is not \"<adapter> <digest>\"")
+    listed = [adapter for adapter, _ in lines]
+    expected = published()
+    if sorted(listed) != sorted(expected):
+        missing = [a for a in expected if a not in listed]
+        extra = sorted({a for a in listed if a not in expected or listed.count(a) > 1})
+        raise SystemExit(f"{digests_file} does not list each adapter of ADAPTERS in the Makefile once:"
+                         f" missing {' '.join(missing) or 'none'}; not published or repeated {' '.join(extra) or 'none'}")
+    digests = dict(lines)
 
     upstream, images = {}, {}
     for adapter, digest in digests.items():

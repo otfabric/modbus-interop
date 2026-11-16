@@ -8,7 +8,7 @@ If you discover a security vulnerability in `modbus-interop`, please report it r
 
 Instead, please email **security@otfabric.io**, or open a private advisory on GitHub (the [Security](https://github.com/otfabric/modbus-interop/security) tab → **Advisories** → **Report a vulnerability**), with a description, steps to reproduce and the affected image tag or digest.
 
-Vulnerabilities in the bundled implementations themselves (libmodbus, PyModbus, digitalpetri/modbus, NModbus, tokio-modbus) belong upstream; report them there, and tell us so that the pin can be moved.
+Vulnerabilities in the bundled implementations themselves (libmodbus, PyModbus, digitalpetri/modbus, NModbus, tokio-modbus, j2mod, jsmodbus, modbus-esp8266, modbus4j) belong upstream; report them there, and tell us so that the pin can be moved.
 
 ## Supported Versions
 
@@ -37,5 +37,5 @@ The images run **unauthenticated, unencrypted Modbus TCP devices** that accept r
 
 ### Supply chain
 
-- Upstream sources and packages are fetched during the image build at pinned versions, from GitHub, PyPI, Maven Central, NuGet and crates.io; where the ecosystem has lock files or hashes (`requirements.txt` hashes, `Cargo.lock`, NuGet lock files) the build verifies them
+- Upstream sources and packages are fetched during the image build at pinned versions, from GitHub, PyPI, Maven Central, NuGet, crates.io and npm; where the ecosystem has lock files or hashes (`requirements.txt` hashes, `Cargo.lock`, NuGet lock files, `package-lock.json`) the build verifies them
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists what each image contains and under which licence; the licence texts are in `/licenses` of every image

@@ -31,7 +31,8 @@ It owns the reference implementations, their adapters, the fixtures, the
 container contract, the images and the self-tests that show the references
 agree with each other.
 
-It does not contain, import, build or know about any library under test. A
+It does not contain, import, build or know about any library under test, apart
+from `own/` ([below](#ot-fabrics-own-stack)), kept out of its releases. A
 Modbus library is a consumer: it pulls the images and owns its own scenarios,
 assertions and compatibility claims. A passing self-test here says the
 *references* interoperate; it says nothing about a consumer.
