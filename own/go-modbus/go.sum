@@ -1,4 +1,4 @@
-github.com/otfabric/go-modbus v1.16.1 h1:VvXTHLz73yNHUXrB5BAkelQAp0NHzYpWEsu7iNz7RU4=
-github.com/otfabric/go-modbus v1.16.1/go.mod h1:UfYm3oZyTqS2U+QQd0Cz/cLcO2zgDrxjnrW3aQManWY=
-github.com/otfabric/go-serial v0.4.1 h1:GfLtuIBvWc4ZvAsb0Ab6BEbh3E8qVHVa7TvHaSNh0o4=
-github.com/otfabric/go-serial v0.4.1/go.mod h1:CGEz7RtffVDY/EBU8oN/ydSCjMOdtRpB0LNTc8BmSUQ=
+github.com/otfabric/go-modbus v1.16.2 h1:giib/sgvu+WBefxR1LCgi+eVkeqmtG2kWj5p9SI3rXs=
+github.com/otfabric/go-modbus v1.16.2/go.mod h1:vPP3e6BiL8H/jwlK90htH7HLHduWhiEHx7M46QTeMcw=
+github.com/otfabric/go-serial v0.5.0 h1:hbKs9n/XLa7NnFlG3ftoNRIBsRkeS9NTO2tbqOyS1O4=
+github.com/otfabric/go-serial v0.5.0/go.mod h1:CGEz7RtffVDY/EBU8oN/ydSCjMOdtRpB0LNTc8BmSUQ=
