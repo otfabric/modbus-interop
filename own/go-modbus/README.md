@@ -72,7 +72,14 @@ Declared `false`, because the public API of go-modbus does not offer it and the
 adapter does not encode protocol itself:
 
 - `clientRaw`, `clientRawAnyResponse`: no way to send an arbitrary PDU.
-- `connectionEvents`: no hook for a connection opening or closing.
+
+Declared `false`, because the adapter does not implement it:
+
+- `connectionEvents`: go-modbus reports a server connection opening and closing
+  (`ConnectionLifecycleMetrics` since v1.18.0; `ServerConnectionMetrics`, with a
+  `ConnectionID` per connection, since v1.22.0), but the adapter sets no
+  `ServerConfig.Metrics` and prints no `connection-opened` or
+  `connection-closed`. Nothing here exercises these hooks.
 
 `requestEvents` is declared `true`, with one limit: the handlers print the
 events, so a request the library answers by itself prints none. That is a
