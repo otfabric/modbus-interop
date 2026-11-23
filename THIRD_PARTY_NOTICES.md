@@ -22,7 +22,7 @@ affected by their licences.
 | Component | Version | Licence | Source |
 |-----------|---------|---------|--------|
 | go-modbus | latest release when built | MIT | https://github.com/otfabric/go-modbus |
-| go-serial | v0.2.1 | MIT | https://github.com/otfabric/go-serial |
+| go-serial | the version go-modbus requires; v0.5.0 for go-modbus v1.23.0 (`own/go-modbus/go.mod`) | MIT | https://github.com/otfabric/go-serial |
 | Go standard library | 1.27.2 | BSD-3-Clause | https://go.dev |
 
 ## Image `modbus-interop-libmodbus`
